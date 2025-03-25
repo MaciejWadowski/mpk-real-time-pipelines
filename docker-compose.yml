@@ -36,6 +36,7 @@ services:
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=60
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -62,6 +63,7 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -81,6 +83,7 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
+      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
