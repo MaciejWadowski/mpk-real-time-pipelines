@@ -43,14 +43,14 @@ with DAG(
         # Merge the feeds; for tables present in more than one feed, concatenate the rows.
         merged_feed = feeds[0]
         for feed in feeds[1:]:
-            merged_feed.routes = pd.concat([merged_feed.routes, feed.routes], ignore_index=True)
-            merged_feed.trips = pd.concat([merged_feed.trips, feed.trips], ignore_index=True)
-            merged_feed.stop_times = pd.concat([merged_feed.stop_times, feed.stop_times], ignore_index=True)
-            merged_feed.stops = pd.concat([merged_feed.stops, feed.stops], ignore_index=True)
+            merged_feed.routes = pd.concat([merged_feed.routes, feed.routes], ignore_index=True).drop_duplicates()
+            merged_feed.trips = pd.concat([merged_feed.trips, feed.trips], ignore_index=True).drop_duplicates()
+            merged_feed.stop_times = pd.concat([merged_feed.stop_times, feed.stop_times], ignore_index=True).drop_duplicates()
+            merged_feed.stops = pd.concat([merged_feed.stops, feed.stops], ignore_index=True).drop_duplicates()
             if hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
-                merged_feed.calendar = pd.concat([merged_feed.calendar, feed.calendar], ignore_index=True)
+                merged_feed.calendar = pd.concat([merged_feed.calendar, feed.calendar], ignore_index=True).drop_duplicates()
             elif not hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
-                merged_feed.calendar = feed.calendar.copy()
+                merged_feed.calendar = feed.calendar.copy().drop_duplicates()
         return merged_feed
 
     def download_and_save_csv():
