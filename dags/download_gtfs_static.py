@@ -15,7 +15,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id='gtfs_download_to_csv',
+    dag_id='gtfs_download_static',
     default_args=default_args,
     description='Download GTFS data for Kraków and save tables as CSV files',
     schedule_interval='@daily',
@@ -62,7 +62,7 @@ with DAG(
         merged_feed = merge_gtfs_feeds()
         
         # Define the output directory (adjust if needed)
-        output_dir = 'data_csv'
+        output_dir = "/path/to/your/output/directory"  # change to proper
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
