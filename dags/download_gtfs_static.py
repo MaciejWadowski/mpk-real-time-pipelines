@@ -1,7 +1,6 @@
 import os
 import datetime
-import pandas as pd
-import gtfs_kit as gk
+import logging
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
@@ -23,6 +22,8 @@ with DAG(
 ) as dag:
 
     def merge_gtfs_feeds():
+        import pandas as pd
+        import gtfs_kit as gk
         """
         Downloads GTFS feeds from the provided URLs using gtfs_kit
         and merges common tables: routes, trips, stop_times, stops,

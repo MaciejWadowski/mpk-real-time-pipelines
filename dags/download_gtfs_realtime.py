@@ -1,6 +1,7 @@
 import os
 import datetime
 import requests
+import logging
 
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
@@ -14,27 +15,47 @@ default_args = {
     'retry_delay': datetime.timedelta(minutes=1),
 }
 
+logger = logging.getLogger(__file__)
+
+
+# Kafka configuration
+conf = {
+    'bootstrap.servers': 'kafka:9092',  # Kafka broker (adjust if using remote broker)
+    'client.id': 'mpk-real-time-producer'
+}
+
+# Create Kafka producer
+
+# Callback to handle delivery report
+def delivery_report(err, msg):
+    if err is not None:
+        logger.error(f"Message delivery failed: {err}")
+    else:
+        logger.info(f"Message delivered to {msg.topic()} partition {msg.partition()}")
+
+# Produce a message to a Kafka topic
+def produce_message(topic, message):
+    from confluent_kafka import Producer
+    producer = Producer(conf)
+    producer.produce(topic, message.encode('utf-8'), callback=delivery_report)
+    producer.flush()
+
 # download GTFS-Realtime data and save it to file
 def fetch_gtfs_realtime():
+    import gtfs_realtime_pb2 as pb
+    from google.protobuf.json_format import MessageToJson
+
     url = "https://gtfs.ztp.krakow.pl/VehiclePositions_T.pb"
-    print(f"Download real‑time data from: {url}")
+    logger.info(f"Download real‑time data from: {url}")
     response = requests.get(url)
-    
-    if response.status_code == 200:
-        # Create output catalog if it not exists
-        output_dir = "/path/to/your/output/directory"  # change to proper
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Filename with current timestamp
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_path = os.path.join(output_dir, f"VehiclePositions_T_{timestamp}.pb")
-        
-        with open(file_path, "wb") as f:
-            f.write(response.content)
-        
-        print(f"Real‑time data are saved to: {file_path}")
+    if response.ok:
+        feed = pb.FeedMessage()
+        feed.ParseFromString(response.content)
+        message = MessageToJson(feed)
+        produce_message("mpk-real-time-feed", message)
     else:
-        print(f"Error status code: {response.status_code}")
+        logger.error(f"Error status code: {response.status_code}")
+        response.raise_for_status()
 
 # DAG definition with 5 mintues interval
 with DAG(
