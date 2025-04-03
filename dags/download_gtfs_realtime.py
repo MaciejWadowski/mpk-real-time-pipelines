@@ -45,13 +45,14 @@ def fetch_gtfs_realtime():
     import gtfs_realtime_pb2 as pb
     from google.protobuf.json_format import MessageToJson
 
-    url = "https://gtfs.ztp.krakow.pl/VehiclePositions_T.pb"
+    url = "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb"
     logger.info(f"Download real‑time data from: {url}")
     response = requests.get(url)
     if response.ok:
         feed = pb.FeedMessage()
         feed.ParseFromString(response.content)
         message = MessageToJson(feed)
+        logger.info(message)
         produce_message("mpk-real-time-feed", message)
     else:
         logger.error(f"Error status code: {response.status_code}")
