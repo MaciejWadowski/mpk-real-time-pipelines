@@ -273,7 +273,7 @@ if __name__ == '__main__':
         ("T", "https://gtfs.ztp.krakow.pl/VehiclePositions_T.pb"),
         ("A", "https://gtfs.ztp.krakow.pl/VehiclePositions_A.pb"),
         ("M", "https://gtfs.ztp.krakow.pl/VehiclePositions_M.pb"),
-        ("TR", "https://gtfs.ztp.krakow.pl/VehiclePositions_TR.pb")
+        ("TR", "https://gtfs.ztp.krakow.pl/VehiclePositions.pb")
     ]
     
     all_vehicles = []
@@ -298,7 +298,7 @@ if __name__ == '__main__':
         ("T", "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb"),
         ("A", "https://gtfs.ztp.krakow.pl/TripUpdates_A.pb"),
         ("M", "https://gtfs.ztp.krakow.pl/TripUpdates_M.pb"),
-        ("TR", "https://gtfs.ztp.krakow.pl/TripUpdates_TR.pb")
+        ("TR", "https://gtfs.ztp.krakow.pl/TripUpdates.pb")
     ]
     
     all_trip_updates = []
