@@ -16,9 +16,9 @@ from google.transit import gtfs_realtime_pb2
 SF_USER = 'GTFS_UPLOADER'
 SF_PASSWORD = 'PSWD124'
 SF_ACCOUNT = 'FIJHPBP-OQ13375'
-SF_DATABASE = 'GTFS'
-SF_SCHEMA_STATIC = 'SCHEDULE'       # For static (schedule) data
-SF_SCHEMA_REALTIME = 'REALTIME'      # For real‑time vehicle data
+SF_DATABASE = 'GTFS_TEST'
+SF_SCHEMA_STATIC = 'SCHEDULE'  # For static (schedule) data
+SF_SCHEMA_REALTIME = 'REALTIME'  # For real‑time vehicle data
 SF_SCHEMA_TRIP_UPDATES = 'TRIP_UPDATES'  # For trip updates data
 SF_WAREHOUSE = 'COMPUTE_WH'
 
@@ -34,9 +34,10 @@ ctx = snowflake.connector.connect(
 )
 cs = ctx.cursor()
 print("Connected to Snowflake.")
-
+load_timestamp = datetime.datetime.now().timestamp()
 # Set role first, then set the current database.
 cs.execute("USE ROLE GTFS_UPLOADER_ROLE")
+cs.execute(f"CREATE DATABASE IF NOT EXISTS {SF_DATABASE}")
 cs.execute(f"USE DATABASE {SF_DATABASE}")
 print(f"Current database set to {SF_DATABASE} and role set to GTFS_UPLOADER_ROLE.\n")
 
@@ -48,6 +49,7 @@ for schema in [SF_SCHEMA_STATIC, SF_SCHEMA_REALTIME, SF_SCHEMA_TRIP_UPDATES]:
 # Optionally, create the stage (if needed for file loading)
 cs.execute("CREATE OR REPLACE STAGE GTFS.SCHEDULE.GTFS_STAGE")
 print("Stage GTFS.SCHEDULE.GTFS_STAGE created or replaced.\n")
+
 
 # -------------------------------------------------------------------
 # FUNCTIONS TO CREATE TABLES IN SNOWFLAKE
@@ -75,6 +77,7 @@ def generate_create_table_ddl(table_name, df, schema):
     ddl = f'CREATE OR REPLACE TABLE {schema}.{table_name.upper()} (\n  ' + ',\n  '.join(col_defs) + '\n);'
     return ddl
 
+
 def create_table_in_snowflake(ctx, table_name, df, schema):
     """
     Creates a table in Snowflake (in the given schema) based on the DataFrame's structure.
@@ -86,16 +89,17 @@ def create_table_in_snowflake(ctx, table_name, df, schema):
     cs_local.close()
     print(f"Table {schema}.{table_name.upper()} created.")
 
+
 # -------------------------------------------------------------------
 # STATIC GTFS FUNCTIONS
 # -------------------------------------------------------------------
 # List of static GTFS feed URLs for different modes in Kraków.
-GTFS_URLS = [
-    "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip",
-    "https://gtfs.ztp.krakow.pl/GTFS_KRK_M.zip",
-    "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
-    # "https://gtfs.ztp.krakow.pl/GTFS_KRK_TR.zip"
-]
+GTFS_URLS = {
+   "A": "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip",
+   "M": "https://gtfs.ztp.krakow.pl/GTFS_KRK_M.zip",
+   "T": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
+}
+
 
 def merge_gtfs_feeds(urls):
     """
@@ -103,24 +107,36 @@ def merge_gtfs_feeds(urls):
     routes, trips, stop_times, stops, and calendar (if available).
     Removes duplicates.
     """
-    feeds = []
-    for url in urls:
+    feeds = {}
+    for key, url in urls.items():
         print(f"Downloading static GTFS data from: {url}")
         feed = gk.read_feed(url, dist_units="km")
-        feeds.append(feed)
-    
-    merged_feed = feeds[0]
-    for feed in feeds[1:]:
+        feeds[key] = feed
+
+    merged_feed = feeds['A']
+    for key, feed in feeds.items():
         merged_feed.routes = pd.concat([merged_feed.routes, feed.routes], ignore_index=True).drop_duplicates()
         merged_feed.trips = pd.concat([merged_feed.trips, feed.trips], ignore_index=True).drop_duplicates()
-        merged_feed.stop_times = pd.concat([merged_feed.stop_times, feed.stop_times], ignore_index=True).drop_duplicates()
+        merged_feed.stop_times = pd.concat([merged_feed.stop_times, feed.stop_times],
+                                           ignore_index=True).drop_duplicates()
         merged_feed.stops = pd.concat([merged_feed.stops, feed.stops], ignore_index=True).drop_duplicates()
         if hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
             merged_feed.calendar = pd.concat([merged_feed.calendar, feed.calendar], ignore_index=True).drop_duplicates()
         elif not hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
             merged_feed.calendar = feed.calendar.copy().drop_duplicates()
+        merged_feed.routes['mode'] = key
+        merged_feed.trips['mode'] = key
+        merged_feed.stop_times['mode'] = key
+        merged_feed.stops['mode'] = key
+        merged_feed.calendar['mode'] = key
+    merged_feed.routes['load_timestamp'] = load_timestamp
+    merged_feed.trips['load_timestamp'] = load_timestamp
+    merged_feed.stop_times['load_timestamp'] = load_timestamp
+    merged_feed.stops['load_timestamp'] = load_timestamp
+    merged_feed.calendar['load_timestamp'] = load_timestamp
     print("Static GTFS feeds merged successfully.\n")
     return merged_feed
+
 
 def save_static_data_to_snowflake(ctx, merged_feed):
     """
@@ -148,6 +164,7 @@ def save_static_data_to_snowflake(ctx, merged_feed):
         else:
             print(f"Upload failed for table {table.upper()}.\n")
 
+
 # -------------------------------------------------------------------
 # REAL‑TIME GTFS‑Realtime VEHICLE FUNCTIONS
 # -------------------------------------------------------------------
@@ -164,6 +181,7 @@ def fetch_real_time_data(url):
     else:
         print(f"Failed to download real‑time data. Status code: {response.status_code}")
         return None
+
 
 def parse_vehicle_positions(pb_data):
     """
@@ -182,9 +200,11 @@ def parse_vehicle_positions(pb_data):
                     'vehicle_id': vehicle.vehicle.id,
                     'latitude': vehicle.position.latitude,
                     'longitude': vehicle.position.longitude,
-                    'timestamp': vehicle.timestamp
+                    'timestamp': vehicle.timestamp,
+                    'load_timestamp': load_timestamp
                 })
     return vehicles
+
 
 def save_realtime_data_to_snowflake(ctx, vehicles):
     """
@@ -208,6 +228,7 @@ def save_realtime_data_to_snowflake(ctx, vehicles):
     else:
         print(f"Failed to upload real‑time data to table {table_name}.\n")
 
+
 # -------------------------------------------------------------------
 # REAL‑TIME GTFS‑Realtime TRIP UPDATES FUNCTIONS
 # -------------------------------------------------------------------
@@ -230,10 +251,13 @@ def parse_trip_updates(pb_data):
                     'stop_sequence': stu.stop_sequence if stu.HasField("stop_sequence") else None,
                     'arrival': stu.arrival.time if stu.HasField("arrival") else None,
                     'departure': stu.departure.time if stu.HasField("departure") else None,
-                    'schedule_relationship': stu.schedule_relationship if stu.HasField("schedule_relationship") else None
+                    'schedule_relationship': stu.schedule_relationship if stu.HasField(
+                        "schedule_relationship") else None,
+                    'load_timestamp': load_timestamp
                 }
                 updates.append(update_dict)
     return updates
+
 
 def save_trip_updates_to_snowflake(ctx, updates):
     """
@@ -257,16 +281,17 @@ def save_trip_updates_to_snowflake(ctx, updates):
     else:
         print(f"Failed to upload trip updates data to table {table_name}.\n")
 
+
 # -------------------------------------------------------------------
 # MAIN EXECUTION BLOCK
 # -------------------------------------------------------------------
 if __name__ == '__main__':
-    
+
     # PART 1: PROCESS STATIC GTFS DATA
     print("=== Processing static GTFS data ===\n")
     merged_feed = merge_gtfs_feeds(GTFS_URLS)
     save_static_data_to_snowflake(ctx, merged_feed)
-    
+
     # PART 2: PROCESS GTFS‑Realtime VEHICLE DATA
     print("\n=== Processing GTFS‑Realtime vehicle data ===")
     realtime_sources = [
@@ -275,7 +300,7 @@ if __name__ == '__main__':
         ("M", "https://gtfs.ztp.krakow.pl/VehiclePositions_M.pb"),
         ("TR", "https://gtfs.ztp.krakow.pl/VehiclePositions.pb")
     ]
-    
+
     all_vehicles = []
     for mode, url in realtime_sources:
         pb_data = fetch_real_time_data(url)
@@ -286,12 +311,12 @@ if __name__ == '__main__':
                 v['mode'] = mode
             print(f"Parsed {len(vehicles)} real‑time vehicle records from mode {mode}.")
             all_vehicles.extend(vehicles)
-    
+
     if all_vehicles:
         save_realtime_data_to_snowflake(ctx, all_vehicles)
     else:
         print("No real‑time vehicle data available from any source.")
-    
+
     # PART 3: PROCESS GTFS‑Realtime TRIP UPDATES DATA
     print("\n=== Processing GTFS‑Realtime trip updates data ===")
     trip_updates_sources = [
@@ -300,7 +325,7 @@ if __name__ == '__main__':
         ("M", "https://gtfs.ztp.krakow.pl/TripUpdates_M.pb"),
         ("TR", "https://gtfs.ztp.krakow.pl/TripUpdates.pb")
     ]
-    
+
     all_trip_updates = []
     for mode, url in trip_updates_sources:
         pb_data = fetch_real_time_data(url)
@@ -311,12 +336,12 @@ if __name__ == '__main__':
                 u['mode'] = mode
             print(f"Parsed {len(updates)} trip updates records from mode {mode}.")
             all_trip_updates.extend(updates)
-    
+
     if all_trip_updates:
         save_trip_updates_to_snowflake(ctx, all_trip_updates)
     else:
         print("No trip updates data available from any source.")
-    
+
     # Close the Snowflake connection.
     cs.close()
     ctx.close()

@@ -36,7 +36,7 @@ services:
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=60
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit
+      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit apache-airflow-providers-snowflake gtfs-realtime-bindings
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -63,7 +63,7 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit
+      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit apache-airflow-providers-snowflake gtfs-realtime-bindings
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -83,90 +83,12 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit protobuf==5.29.3 confluent-kafka
+      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit apache-airflow-providers-snowflake gtfs-realtime-bindings
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
     command: celery worker
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: zookeeper
-    restart: unless-stopped
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    volumes:
-      - zookeeper_data:/var/lib/zookeeper
-    ports:
-      - "2181:2181"
-
-  kafka_broker:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: kafka
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_MESSAGE_MAX_BYTES: 10485760  # 10MB
-      KAFKA_MAX_REQUEST_SIZE: 10485760  # Increase request size for producer
-      KAFKA_SOCKET_REQUEST_MAX_BYTES: 10485760  # Ensure Kafka
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    ports:
-      - "9093:9093"
-
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.0
-    container_name: schema-registry
-    restart: unless-stopped
-    depends_on:
-      - kafka
-    environment:
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-    ports:
-      - "8081:8081"
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    restart: unless-stopped
-    depends_on:
-      - kafka
-      - schema-registry
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
-    ports:
-      - "8083:8080"
-
-  rest-proxy:
-    image: confluentinc/cp-kafka-rest:7.5.0
-    container_name: kafka-rest-proxy
-    depends_on:
-      - kafka
-      - schema-registry
-    environment:
-      KAFKA_REST_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
-      KAFKA_REST_LISTENERS: http://0.0.0.0:8082
-      KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry:8081
-    ports:
-      - "8082:8082"
-
 volumes:
   postgres_data:
-    driver: local
-  zookeeper_data:
-    driver: local
-  kafka_data:
     driver: local
