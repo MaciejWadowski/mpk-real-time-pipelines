@@ -17,7 +17,7 @@ SF_USER = 'GTFS_UPLOADER'
 SF_PASSWORD = 'PSWD124'
 SF_ACCOUNT = 'FIJHPBP-OQ13375'
 SF_DATABASE = 'GTFS'
-SF_SCHEMA_STATIC = 'STAGING'       # For static (schedule) data
+SF_SCHEMA_STATIC = 'SCHEDULE'       # For static (schedule) data
 SF_SCHEMA_REALTIME = 'REALTIME'      # For real‑time vehicle data
 SF_SCHEMA_TRIP_UPDATES = 'TRIP_UPDATES'  # For trip updates data
 SF_WAREHOUSE = 'COMPUTE_WH'
@@ -30,7 +30,7 @@ ctx = snowflake.connector.connect(
     account=SF_ACCOUNT,
     warehouse=SF_WAREHOUSE,
     database=SF_DATABASE,
-    schema=SF_SCHEMA_STATIC  # initially set to STAGING schema (static data)
+    schema=SF_SCHEMA_STATIC  # initially set to SCHEDULE schema (static data)
 )
 cs = ctx.cursor()
 print("Connected to Snowflake.")
@@ -46,8 +46,8 @@ for schema in [SF_SCHEMA_STATIC, SF_SCHEMA_REALTIME, SF_SCHEMA_TRIP_UPDATES]:
     print(f"Schema {schema} ensured to exist.")
 
 # Optionally, create the stage (if needed for file loading)
-cs.execute("CREATE OR REPLACE STAGE GTFS.STAGING.GTFS_STAGE")
-print("Stage GTFS.STAGING.GTFS_STAGE created or replaced.\n")
+cs.execute("CREATE OR REPLACE STAGE GTFS.SCHEDULE.GTFS_STAGE")
+print("Stage GTFS.SCHEDULE.GTFS_STAGE created or replaced.\n")
 
 # -------------------------------------------------------------------
 # FUNCTIONS TO CREATE TABLES IN SNOWFLAKE
@@ -124,7 +124,7 @@ def merge_gtfs_feeds(urls):
 
 def save_static_data_to_snowflake(ctx, merged_feed):
     """
-    Creates tables in the STAGING schema and uploads static GTFS data.
+    Creates tables in the SCHEDULE schema and uploads static GTFS data.
     The tables are: ROUTES, TRIPS, STOP_TIMES, STOPS and CALENDAR (if available).
     Before uploading, the tables are truncated.
     """
@@ -135,9 +135,9 @@ def save_static_data_to_snowflake(ctx, merged_feed):
         df = getattr(merged_feed, table).reset_index(drop=True)
         # Ensure all column names are uppercase.
         df = df.rename(columns=lambda x: x.upper())
-        # Create the table in the STAGING schema.
+        # Create the table in the SCHEDULE schema.
         create_table_in_snowflake(ctx, table, df, SF_SCHEMA_STATIC)
-        # Set the current schema to STAGING before uploading data.
+        # Set the current schema to SCHEDULE before uploading data.
         cs.execute(f"USE SCHEMA {SF_SCHEMA_STATIC}")
         # Truncate the table before upload.
         cs.execute(f"TRUNCATE TABLE {SF_SCHEMA_STATIC}.{table.upper()}")
