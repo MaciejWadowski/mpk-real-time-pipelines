@@ -114,7 +114,18 @@ def merge_gtfs_feeds(urls):
         feeds[key] = feed
 
     merged_feed = feeds['A']
+    merged_feed.routes['mode'] = 'A'
+    merged_feed.trips['mode'] = 'A'
+    merged_feed.stop_times['mode'] = 'A'
+    merged_feed.stops['mode'] = 'A'
+    merged_feed.calendar['mode'] = 'A'
+    
     for key, feed in feeds.items():
+        feed.routes['mode'] = key
+        feed.trips['mode'] = key
+        feed.stop_times['mode'] = key
+        feed.stops['mode'] = key
+        feed.calendar['mode'] = key
         merged_feed.routes = pd.concat([merged_feed.routes, feed.routes], ignore_index=True).drop_duplicates()
         merged_feed.trips = pd.concat([merged_feed.trips, feed.trips], ignore_index=True).drop_duplicates()
         merged_feed.stop_times = pd.concat([merged_feed.stop_times, feed.stop_times],
@@ -124,11 +135,6 @@ def merge_gtfs_feeds(urls):
             merged_feed.calendar = pd.concat([merged_feed.calendar, feed.calendar], ignore_index=True).drop_duplicates()
         elif not hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
             merged_feed.calendar = feed.calendar.copy().drop_duplicates()
-        merged_feed.routes['mode'] = key
-        merged_feed.trips['mode'] = key
-        merged_feed.stop_times['mode'] = key
-        merged_feed.stops['mode'] = key
-        merged_feed.calendar['mode'] = key
     merged_feed.routes['load_timestamp'] = load_timestamp
     merged_feed.trips['load_timestamp'] = load_timestamp
     merged_feed.stop_times['load_timestamp'] = load_timestamp
