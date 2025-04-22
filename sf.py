@@ -94,7 +94,7 @@ GTFS_URLS = [
     "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip",
     "https://gtfs.ztp.krakow.pl/GTFS_KRK_M.zip",
     "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
-    "https://gtfs.ztp.krakow.pl/GTFS_KRK_TR.zip"
+    # "https://gtfs.ztp.krakow.pl/GTFS_KRK_TR.zip"
 ]
 
 def merge_gtfs_feeds(urls):
