@@ -15,7 +15,7 @@ from google.transit import gtfs_realtime_pb2
 # Use the following connection parameters.
 SF_USER = 'GTFS_UPLOADER'
 SF_PASSWORD = 'PSWD124'
-SF_ACCOUNT = 'FIJHPBP-OQ13375'
+SF_ACCOUNT = 'VINYCTP-BD50363'
 SF_DATABASE = 'GTFS_TEST'
 SF_SCHEMA_STATIC = 'SCHEDULE'  # For static (schedule) data
 SF_SCHEMA_REALTIME = 'REALTIME'  # For real‑time vehicle data
@@ -37,7 +37,7 @@ print("Connected to Snowflake.")
 load_timestamp = datetime.datetime.now().timestamp()
 # Set role first, then set the current database.
 cs.execute("USE ROLE GTFS_UPLOADER_ROLE")
-cs.execute(f"CREATE DATABASE IF NOT EXISTS {SF_DATABASE}")
+# cs.execute(f"CREATE DATABASE IF NOT EXISTS {SF_DATABASE}")
 cs.execute(f"USE DATABASE {SF_DATABASE}")
 print(f"Current database set to {SF_DATABASE} and role set to GTFS_UPLOADER_ROLE.\n")
 
@@ -47,7 +47,7 @@ for schema in [SF_SCHEMA_STATIC, SF_SCHEMA_REALTIME, SF_SCHEMA_TRIP_UPDATES]:
     print(f"Schema {schema} ensured to exist.")
 
 # Optionally, create the stage (if needed for file loading)
-cs.execute("CREATE OR REPLACE STAGE GTFS.SCHEDULE.GTFS_STAGE")
+cs.execute(f"CREATE OR REPLACE STAGE {SF_DATABASE}.SCHEDULE.GTFS_STAGE")
 print("Stage GTFS.SCHEDULE.GTFS_STAGE created or replaced.\n")
 
 
