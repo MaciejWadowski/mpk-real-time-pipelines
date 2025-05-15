@@ -28,6 +28,7 @@ def create_table_in_snowflake(ctx, table_name, df, schema):
     cs_local.close()
     print(f"Table {schema}.{table_name.upper()} created.")
 
+
 with DAG(
     dag_id='gtfs_download_static',
     default_args=default_args,
@@ -41,36 +42,67 @@ with DAG(
         import gtfs_kit as gk
         """
         Downloads GTFS feeds from the provided URLs using gtfs_kit
-        and merges common tables: routes, trips, stop_times, stops,
-        and calendar (if available).
+        and merges the common tables: routes, trips, stop_times, stops,
+        calendar (if available) and calendar_dates (if available).
+        Additionally, each feed is tagged with a "mode" field using a hardcoded letter.
         """
-        GTFS_URLS = [
-            "https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip",
-            "https://gtfs.ztp.krakow.pl/GTFS_KRK_M.zip",
-            "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
+        GTFS_FEEDS = [
+            ("https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip", "A"),
+            ("https://gtfs.ztp.krakow.pl/GTFS_KRK_M.zip", "M"),
+            ("https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip", "T")
         ]
         feeds = []
-        for url in GTFS_URLS:
+        for url, mode_letter in GTFS_FEEDS:
             print(f"Downloading data from: {url}")
             feed = gk.read_feed(url, dist_units="km")
+            
+            # Add a new column "mode" to each table if present.
+            if hasattr(feed, "routes"):
+                feed.routes["mode"] = mode_letter
+            if hasattr(feed, "trips"):
+                feed.trips["mode"] = mode_letter
+            if hasattr(feed, "stop_times"):
+                feed.stop_times["mode"] = mode_letter
+            if hasattr(feed, "stops"):
+                feed.stops["mode"] = mode_letter
+            if hasattr(feed, "calendar"):
+                feed.calendar["mode"] = mode_letter
+            if hasattr(feed, "calendar_dates"):
+                feed.calendar_dates["mode"] = mode_letter
+
             feeds.append(feed)
 
-        # Merge the feeds; for tables present in more than one feed, concatenate the rows.
+        # Start merging from the first feed
         merged_feed = feeds[0]
         for feed in feeds[1:]:
             merged_feed.routes = pd.concat([merged_feed.routes, feed.routes], ignore_index=True).drop_duplicates()
             merged_feed.trips = pd.concat([merged_feed.trips, feed.trips], ignore_index=True).drop_duplicates()
             merged_feed.stop_times = pd.concat([merged_feed.stop_times, feed.stop_times], ignore_index=True).drop_duplicates()
             merged_feed.stops = pd.concat([merged_feed.stops, feed.stops], ignore_index=True).drop_duplicates()
+
             if hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
                 merged_feed.calendar = pd.concat([merged_feed.calendar, feed.calendar], ignore_index=True).drop_duplicates()
             elif not hasattr(merged_feed, "calendar") and hasattr(feed, "calendar"):
                 merged_feed.calendar = feed.calendar.copy().drop_duplicates()
+
+            if hasattr(feed, "calendar_dates"):
+                if hasattr(merged_feed, "calendar_dates"):
+                    merged_feed.calendar_dates = pd.concat([merged_feed.calendar_dates, feed.calendar_dates],
+                                                           ignore_index=True).drop_duplicates()
+                else:
+                    merged_feed.calendar_dates = feed.calendar_dates.copy().drop_duplicates()
+
+        # Add a load timestamp to each table
         merged_feed.routes['load_timestamp'] = logical_date
         merged_feed.trips['load_timestamp'] = logical_date
         merged_feed.stop_times['load_timestamp'] = logical_date
         merged_feed.stops['load_timestamp'] = logical_date
-        merged_feed.calendar['load_timestamp'] = logical_date
+        
+        if hasattr(merged_feed, "calendar"):
+            merged_feed.calendar['load_timestamp'] = logical_date
+        
+        if hasattr(merged_feed, "calendar_dates"):
+            merged_feed.calendar_dates['load_timestamp'] = logical_date
 
         return merged_feed
 
@@ -80,63 +112,76 @@ with DAG(
         Generates a CREATE OR REPLACE TABLE DDL command based on a DataFrame's structure.
         Mapping: integer -> NUMBER, float -> FLOAT, datetime -> TIMESTAMP_NTZ, others -> VARCHAR.
         Column names are converted to uppercase.
-
-        This version converts the dtype to a string then checks for keywords ("int", "float", "datetime").
+        Special case: the "load_timestamp" column is always mapped to TIMESTAMP_NTZ.
         """
         col_defs = []
         for col, dtype in df.dtypes.items():
-            dtype_str = str(dtype).lower()
-            if "int" in dtype_str:
-                sf_type = "NUMBER"
-            elif "float" in dtype_str:
-                sf_type = "FLOAT"
-            elif "datetime" in dtype_str:
+            # Check if the column is "load_timestamp" (case-insensitive) and force TIMESTAMP_NTZ.
+            if col.lower() == "load_timestamp":
                 sf_type = "TIMESTAMP_NTZ"
             else:
-                sf_type = "VARCHAR"
+                dtype_str = str(dtype).lower()
+                if "int" in dtype_str:
+                    sf_type = "NUMBER"
+                elif "float" in dtype_str:
+                    sf_type = "FLOAT"
+                elif "datetime" in dtype_str:
+                    sf_type = "TIMESTAMP_NTZ"
+                else:
+                    sf_type = "VARCHAR"
             col_defs.append(f'"{col.upper()}" {sf_type}')
         ddl = f'CREATE TABLE IF NOT EXISTS {schema}.{table_name.upper()} (\n  ' + ',\n  '.join(col_defs) + '\n);'
         return ddl
 
 
-
-
     def save_static_data_to_snowflake(ctx, merged_feed):
         """
         Creates tables in the SCHEDULE schema and uploads static GTFS data.
-        The tables are: ROUTES, TRIPS, STOP_TIMES, STOPS and CALENDAR (if available).
+        The tables are: ROUTES, TRIPS, STOP_TIMES, STOPS,
+        CALENDAR (if available) and CALENDAR_DATES (if available).
         Before uploading, the tables are truncated.
         """
         cs = ctx.cursor()
         tables = ["routes", "trips", "stop_times", "stops"]
         if hasattr(merged_feed, "calendar"):
             tables.append("calendar")
+        if hasattr(merged_feed, "calendar_dates"):
+            tables.append("calendar_dates")
+            
         for table in tables:
             df = getattr(merged_feed, table).reset_index(drop=True)
-            # Ensure all column names are uppercase.
+            # Convert all column names to uppercase.
             df = df.rename(columns=lambda x: x.upper())
-            # Create the table in the SCHEDULE schema.
+            
+            # Optionally remove timezone from any datetime columns.
+            # This ensures no column is timezone-aware.
+            for col in df.select_dtypes(include=['datetimetz']).columns:
+                df[col] = df[col].dt.tz_localize(None)
+            
             create_table_in_snowflake(ctx, table, df, "SCHEDULE")
-            # Set the current schema to SCHEDULE before uploading data.
-            cs.execute(f"USE SCHEMA SCHEDULE")
+            cs.execute("USE SCHEMA SCHEDULE")
             print(f"Uploading static data for table {table.upper()} to Snowflake...")
-            success, nchunks, nrows, _ = write_pandas(ctx, df, table.upper(), auto_create_table=False)
+            
+            # Pass use_logical_type=True to help the connector correctly convert times.
+            success, nchunks, nrows, _ = write_pandas(
+                ctx, df, table.upper(), auto_create_table=False, use_logical_type=True
+            )
+            
             if success:
                 print(f"Table {table.upper()} uploaded successfully: {nrows} rows in {nchunks} chunks.\n")
             else:
                 print(f"Upload failed for table {table.upper()}.\n")
 
+
     def ingest_static_data_to_snowflake(**kwargs):
         """
-        Downloads and merges the GTFS feeds and saves each merged table as a CSV file.
-        The files are stored in the output directory 'data_csv'.
+        Downloads and merges the GTFS feeds and uploads the merged static data to Snowflake.
         """
-        # Merge all feeds
+        # Merge all feeds using the provided logical_date argument.
         merged_feed = merge_gtfs_feeds(kwargs['logical_date'])
         hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
         conn = hook.get_conn()
         save_static_data_to_snowflake(conn, merged_feed)
-        
 
 
     download_gtfs_task = PythonOperator(
