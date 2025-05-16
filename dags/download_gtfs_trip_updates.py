@@ -10,8 +10,8 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 from snowflake.connector.pandas_tools import write_pandas
 
-# Define the Snowflake schema for Trip Updates
-SF_SCHEMA_TRIP_UPDATES = "TRIP_UPDATES"  # Destination: GTFS_TEST.TRIP_UPDATES.TRIP_UPDATES
+# Destination schema for trip updates (historical table resides here)
+SF_SCHEMA_TRIP_UPDATES = "TRIP_UPDATES"  # Under GTFS_TEST.TRIP_UPDATES
 
 default_args = {
     'owner': 'airflow',
@@ -34,12 +34,12 @@ def create_table_in_snowflake(ctx, table_name, df, schema):
 
 def generate_create_table_ddl(table_name, df, schema):
     """
-    Generates a CREATE OR REPLACE TABLE DDL command based on a DataFrame's structure.
+    Generates a CREATE OR REPLACE TABLE DDL command based on the DataFrame's structure.
     Mapping:
-      - integer -> NUMBER,
-      - float   -> FLOAT,
-      - datetime -> TIMESTAMP_NTZ,
-      - others -> VARCHAR.
+      - integer   -> NUMBER,
+      - float     -> FLOAT,
+      - datetime  -> TIMESTAMP_NTZ,
+      - others    -> VARCHAR.
     Column names are converted to uppercase.
     Special case: the "load_timestamp" column is always mapped to TIMESTAMP_NTZ.
     """
@@ -64,7 +64,7 @@ def generate_create_table_ddl(table_name, df, schema):
 
 def fetch_real_time_data(url):
     """
-    Uses the requests library to fetch Google protobuf data from a URL.
+    Uses the requests library to fetch GTFS‑Realtime protobuf data from a URL.
     Returns the content if successful; otherwise, returns None.
     """
     try:
@@ -80,9 +80,8 @@ def fetch_real_time_data(url):
 
 def parse_trip_updates(pb_data, load_timestamp):
     """
-    Parses GTFS‑Realtime Trip Updates protobuf data and returns a list
-    of dictionaries containing: trip_id, stop_id, stop_sequence,
-    arrival, departure, schedule_relationship, load_timestamp.
+    Parses GTFS‑Realtime Trip Updates protobuf data and returns a list of dictionaries containing:
+      trip_id, stop_id, stop_sequence, arrival, departure, schedule_relationship, load_timestamp.
     """
     feed = gtfs_realtime_pb2.FeedMessage()
     feed.ParseFromString(pb_data)
@@ -106,26 +105,25 @@ def parse_trip_updates(pb_data, load_timestamp):
 
 def save_trip_updates_to_snowflake(ctx, updates):
     """
-    Creates the TRIP_UPDATES table in the TRIP_UPDATES schema and uploads trip updates data.
-    Before uploading, truncates the target table.
+    Creates (if necessary) and appends trip updates to the historical TRIP_UPDATES table.
     """
     df = pd.DataFrame(updates).reset_index(drop=True)
     if df.empty:
         print("No trip updates data available to upload.")
         return
 
-    # Convert dataframe column names to uppercase.
+    # Convert column names to uppercase.
     df = df.rename(columns=lambda x: x.upper())
     table_name = "TRIP_UPDATES"
     
-    # Create table in Snowflake.
+    # Create the historical table if it doesn't exist.
     create_table_in_snowflake(ctx, table_name, df, SF_SCHEMA_TRIP_UPDATES)
     
     cs = ctx.cursor()
     cs.execute(f"USE SCHEMA {SF_SCHEMA_TRIP_UPDATES}")
-    cs.execute(f"TRUNCATE TABLE {SF_SCHEMA_TRIP_UPDATES}.{table_name}")
-    print(f"Uploading trip updates data to table {SF_SCHEMA_TRIP_UPDATES}.{table_name} ...")
     
+    # Appending new rows for historical SCD.
+    print(f"Uploading trip updates data to table {SF_SCHEMA_TRIP_UPDATES}.{table_name} ...")
     success, nchunks, nrows, _ = write_pandas(
         ctx, df, table_name, auto_create_table=False, use_logical_type=True
     )
@@ -133,16 +131,17 @@ def save_trip_updates_to_snowflake(ctx, updates):
         print(f"Trip updates data uploaded successfully: {nrows} rows in {nchunks} chunks.\n")
     else:
         print(f"Failed to upload trip updates data to table {table_name}.\n")
+    cs.close()
 
 def ingest_trip_updates_to_snowflake(**kwargs):
     """
-    Downloads and processes GTFS‑Realtime trip updates data from various sources,
-    then uploads the combined data to Snowflake.
+    Downloads and processes GTFS‑Realtime trip updates from various sources,
+    then appends the data to the historical table.
     """
-    # Use the Airflow logical_date if available, otherwise fall back to the current time.
+    # Use the Airflow logical_date if available, otherwise fall back to current time.
     load_timestamp = pd.to_datetime(kwargs.get('logical_date', datetime.datetime.utcnow())).replace(tzinfo=None)
     
-    # Define a list of trip updates sources with hardcoded mode letters.
+    # List of trip updates sources as tuples: (mode, URL)
     trip_updates_sources = [
         ("T", "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb"),
         ("A", "https://gtfs.ztp.krakow.pl/TripUpdates_A.pb"),
@@ -172,10 +171,10 @@ def ingest_trip_updates_to_snowflake(**kwargs):
         print("No trip updates data available from any source.")
 
 with DAG(
-    dag_id='gtfs_load_trip_updates',
+    dag_id='gtfs_load_trip_updates_scd',
     default_args=default_args,
-    description='Load GTFS‑Realtime trip updates data to Snowflake',
-    schedule_interval='@daily',
+    description='Load GTFS‑Realtime trip updates historical data to Snowflake (SCD)',
+    schedule_interval="*/5 * * * *",  # Run every 5 minutes
     catchup=False,
 ) as dag:
     
