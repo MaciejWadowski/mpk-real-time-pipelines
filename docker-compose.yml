@@ -30,7 +30,7 @@ services:
       - redis
     environment:
       - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY} #for test enviroment it's okay, but should be changed in the future.
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY}  # for test environment; should be changed in production.
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL=60
@@ -83,11 +83,14 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - _PIP_ADDITIONAL_REQUIREMENTS=gtfs_kit apache-airflow-providers-snowflake gtfs-realtime-bindings
+      - _PIP_ADDITIONAL_REQUIREMENTS=dbt-snowflake==1.9.4 gtfs_kit gtfs-realtime-bindings
+      - DBT_PROFILES_DIR=/opt/dbt/config
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
+      - ./dbt:/opt/airflow/dbt
+      - ./dbt/profiles.yml:/opt/dbt/config/profiles.yml
     command: celery worker
 volumes:
   postgres_data:

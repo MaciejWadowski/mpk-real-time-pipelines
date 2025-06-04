@@ -1,0 +1,21 @@
+name: 'gtfs_project'
+version: 1.9.6
+config-version: 2
+
+profile: 'gtfs_project'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  gtfs_project:
+    # example:
+    #   +materialized: view

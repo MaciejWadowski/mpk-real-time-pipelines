@@ -171,9 +171,9 @@ def ingest_trip_updates_to_snowflake(**kwargs):
         print("No trip updates data available from any source.")
 
 with DAG(
-    dag_id='gtfs_load_trip_updates_scd',
+    dag_id='gtfs_load_trip_updates',
     default_args=default_args,
-    description='Load GTFS‑Realtime trip updates historical data to Snowflake (SCD)',
+    description='Load GTFS‑Realtime trip updates',
     schedule_interval="*/5 * * * *",  # Run every 5 minutes
     catchup=False,
 ) as dag:

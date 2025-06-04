@@ -6,6 +6,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 from snowflake.connector.pandas_tools import write_pandas
+from airflow.operators.bash_operator import BashOperator
 
 
 default_args = {
@@ -189,4 +190,10 @@ with DAG(
         python_callable=ingest_static_data_to_snowflake,
     )
 
-    download_gtfs_task
+    bash_dbt_operator = BashOperator (   
+                                    task_id='run_dbt', 
+                                    bash_command='cd /opt/airflow/dbt/gtfs_project && dbt run',
+                                    dag=dag
+                                 )
+
+    download_gtfs_task >> bash_dbt_operator

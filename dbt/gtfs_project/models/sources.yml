@@ -1,0 +1,13 @@
+version: 1.9.6
+
+sources:
+  - name: schedule
+    database: gtfs_test
+    schema: schedule
+    tables:
+      - name: calendar_dates
+      - name: calendar
+      - name: routes
+      - name: stop_times
+      - name: stops
+      - name: trips
