@@ -17,5 +17,5 @@ clean-targets:
 
 models:
   gtfs_project:
-    # example:
-    #   +materialized: view
+     example:
+       +materialized: view

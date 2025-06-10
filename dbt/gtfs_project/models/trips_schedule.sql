@@ -47,5 +47,5 @@ JOIN {{ ref('aggregated_calendar') }} E
     )
     OR E.event_date = TO_CHAR(E.load_timestamp, 'YYYYMMDD')
   )
-WHERE C.STOP_NAME IS NOT NULL 
+WHERE C.STOP_NAME IS NOT NULL
 ORDER BY A.STOP_SEQUENCE ASC

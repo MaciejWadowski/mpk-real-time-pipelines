@@ -192,7 +192,7 @@ with DAG(
 
     bash_dbt_operator = BashOperator (   
                                     task_id='run_dbt', 
-                                    bash_command='cd /opt/airflow/dbt/gtfs_project && dbt run',
+                                    bash_command="cd /opt/airflow/dbt/gtfs_project && dbt run --vars '{\"execution_date\": \"{{ds}}\"}'",
                                     dag=dag
                                  )
 

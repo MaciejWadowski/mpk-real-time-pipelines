@@ -12,7 +12,7 @@ date_series AS (
   SELECT DATEADD(day, seq4(), (SELECT first_ld FROM first_date)) AS generated_date
   FROM TABLE(GENERATOR(ROWCOUNT => 10000))
 )
-SELECT 
+SELECT
   TO_CHAR(ds.generated_date, 'YYYYMMDD') AS event_date,
   c.service_id,
   c.mode,
