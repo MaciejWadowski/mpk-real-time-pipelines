@@ -1,4 +1,4 @@
-{{ config(materialized='incremental', alias='TRIPS_SCHEDULE_TABLE')}}
+{{ config(materialized='table', alias='TRIPS_SCHEDULE_TABLE')}}
 
 SELECT 
     A.TRIP_ID,

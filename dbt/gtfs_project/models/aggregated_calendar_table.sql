@@ -1,8 +1,9 @@
-{{ config(materialized='incremental', incremental_strategy='merge', unique_key=['event_date', 'load_timestamp', 'service_id','mode'], alias='AGGREGATED_CALENDAR_TABLE') }}
+{{ config(materialized='table', alias='AGGREGATED_CALENDAR_TABLE') }}
+
 
 with date_series AS (
-  SELECT DATEADD(day, seq4(), '{{ var("execution_date") }}') AS generated_date
-  FROM TABLE(GENERATOR(ROWCOUNT => 5))
+  SELECT DATEADD(day, seq4(), DATEADD('month', -1, '{{ var("execution_date") }}'::DATE)) AS generated_date
+  FROM TABLE(GENERATOR(ROWCOUNT => 10000))
 ),
  all_calendars as (
 SELECT
