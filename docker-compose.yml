@@ -22,7 +22,7 @@ services:
       - "6379:6379"
 
   airflow-webserver:
-    image: apache/airflow:latest
+    image: apache/airflow:2.10.5
     container_name: airflow_webserver
     restart: always
     depends_on:
@@ -52,7 +52,7 @@ services:
       timeout: 10s
 
   airflow-scheduler:
-    image: apache/airflow:latest
+    image: apache/airflow:2.10.5
     container_name: airflow_scheduler
     restart: always
     depends_on:
@@ -71,7 +71,7 @@ services:
     command: scheduler
 
   airflow-worker:
-    image: apache/airflow:latest
+    image: apache/airflow:2.10.5
     container_name: airflow_worker
     restart: always
     depends_on:
