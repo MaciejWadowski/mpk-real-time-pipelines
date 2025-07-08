@@ -20,6 +20,19 @@
 ```shell
 docker compse up -d # starting airflow
 docker compose down # stopping airflow
+
+docker compose run airflow-webserver airflow connections add my_snowflake_conn \
+  --conn-type snowflake \
+  --conn-login "<add username here>" \
+  --conn-password "<add password here> \
+  --conn-schema "SCHEDULE" \
+  --conn-extra '{
+    "account": "MARCQSC-WM98819",
+    "warehouse": "COMPUTE_WH",
+    "database": "GTFS_TEST",
+    "role": "GTFS_UPLOADER_ROLE",
+    "insecure_mode": false
+}'
 ```
 
 Airflow folders:
