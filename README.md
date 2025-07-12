@@ -39,3 +39,7 @@ Airflow folders:
 - `/dags` - a folder that contains all of the DAG's for an airflow. It's scheduled to refresh content of dags folder every 60 seconds, but can be modified with `AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL` env variable
 - `/plugins` - a folder that will contains some custom plugins, probably won't be used ever
 - `/logs` - a folder to logs from airflow(scheduler, dag-processor)
+
+### profiles.yml
+Copy file in /dbt/gtfs_project/test-profiles.yml and name it profiles.yml
+Replace placeholders with your personal values.
