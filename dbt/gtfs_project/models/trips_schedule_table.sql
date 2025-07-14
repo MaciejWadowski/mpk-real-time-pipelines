@@ -1,5 +1,14 @@
 {{ config(materialized='table', alias='TRIPS_SCHEDULE_TABLE')}}
 
+WITH calendar AS (
+  SELECT
+    service_id,
+    mode,
+    event_date,
+    load_timestamp
+  FROM {{ ref('aggregated_calendar_table') }}
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY MODE, EVENT_DATE ORDER BY LOAD_TIMESTAMP DESC) = 1
+)
 SELECT 
     A.TRIP_ID,
     A.MODE,
@@ -31,28 +40,9 @@ JOIN {{ source('schedule', 'routes') }} D
   ON B.ROUTE_ID = D.ROUTE_ID
   AND A.LOAD_TIMESTAMP = D.LOAD_TIMESTAMP
   AND B.MODE = D.MODE
-JOIN {{ ref('aggregated_calendar_table') }} E
+JOIN calendar E
   ON B.SERVICE_ID = E.service_id
   AND B.MODE = E.mode
   AND B.LOAD_TIMESTAMP = E.load_timestamp
-  AND (
-    (
-      E.load_timestamp = (
-          SELECT MAX(F.load_timestamp)
-          FROM {{ ref('aggregated_calendar_table') }} F
-          WHERE F.service_id = E.service_id
-            AND F.mode = E.mode
-            AND to_date(F.load_timestamp) <= '{{ var("execution_date") }}'
-      )
-      AND E.event_date = TO_CHAR(DATEADD(day, 1, E.load_timestamp), 'YYYYMMDD')
-    )
-    OR E.event_date = TO_CHAR(E.load_timestamp, 'YYYYMMDD')
-    
-  )
 WHERE C.STOP_NAME IS NOT NULL
-AND to_date(A.LOAD_TIMESTAMP) = '{{ var("execution_date") }}'
-AND to_date(B.LOAD_TIMESTAMP) = '{{ var("execution_date") }}'
-AND to_date(C.LOAD_TIMESTAMP) = '{{ var("execution_date") }}'
-AND to_date(D.LOAD_TIMESTAMP) = '{{ var("execution_date") }}'
-AND to_date(E.LOAD_TIMESTAMP) = '{{ var("execution_date") }}'
-ORDER BY A.STOP_SEQUENCE ASC
+QUALIFY ROW_NUMBER() OVER (PARTITION BY A.TRIP_ID, A.MODE, E.EVENT_DATE, A.STOP_ID ORDER BY A.LOAD_TIMESTAMP DESC) = 1
