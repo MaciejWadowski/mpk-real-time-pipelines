@@ -11,3 +11,8 @@ sources:
       - name: stop_times
       - name: stops
       - name: trips
+  - name: trip_updates
+    database: gtfs_test
+    schema: trip_updates
+    tables:
+      - name: trip_updates
