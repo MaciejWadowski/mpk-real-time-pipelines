@@ -1,0 +1,20 @@
+{
+  "name": "Jupyter Datascience Notebook",
+  "image": "quay.io/jupyter/datascience-notebook:python-3.12.11",
+  "forwardPorts": [8888],
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "/run/host-services/ssh-auth.sock"
+  },
+  "settings": {
+    "terminal.integrated.defaultProfile.linux": "bash"
+  },
+  "extensions": [
+    "ms-python.python",
+    "ms-toolsai.jupyter"
+  ],
+  "mounts": [
+    "source=${localWorkspaceFolder}/notebooks,target=/home/jovyan/work/notebooks,type=bind"
+  ],
+  "postCreateCommand": "pip install --upgrade pip && pip install dbt-snowflake==1.9.4 gtfs_kit gtfs-realtime-bindings ",
+  "postStartCommand": "jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --NotebookApp.token=''"
+}
