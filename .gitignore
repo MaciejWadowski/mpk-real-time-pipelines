@@ -179,3 +179,4 @@ logs/
 
 .DS_Store
 profiles.yml
+python_connectors/config.yml
