@@ -1,0 +1,96 @@
+{
+  "start_date": "2025-05-21",
+  "end_date": "2025-07-21",
+  "locations": [
+    {
+      "district": "Dzielnica VII Zwierzyniec",
+      "latitude": 50.058293,
+      "longitude": 19.854602
+    },
+    {
+      "district": "Dzielnica X Swoszowice",
+      "latitude": 49.989108,
+      "longitude": 19.953893
+    },
+    {
+      "district": "Dzielnica VIII Dębniki",
+      "latitude": 50.015197,
+      "longitude": 19.866293
+    },
+    {
+      "district": "Dzielnica XII Biezanow-Prokocim",
+      "latitude": 50.017195,
+      "longitude": 20.027415
+    },
+    {
+      "district": "Dzielnica XIII Podgórze",
+      "latitude": 50.040828,
+      "longitude": 20.009344
+    },
+    {
+      "district": "Dzielnica XVIII Nowa Huta",
+      "latitude": 50.072566,
+      "longitude": 20.131459
+    },
+    {
+      "district": "Dzielnica XVI Bieńczyce",
+      "latitude": 50.086412,
+      "longitude": 20.027303
+    },
+    {
+      "district": "Dzielnica IX Łagiewniki-Borek Fałęcki",
+      "latitude": 50.016505,
+      "longitude": 19.929969
+    },
+    {
+      "district": "Dzielnica I Stare Miasto",
+      "latitude": 50.063143,
+      "longitude": 19.941068
+    },
+    {
+      "district": "Dzielnica II Grzegórzki",
+      "latitude": 50.063248,
+      "longitude": 19.966068
+    },
+    {
+      "district": "Dzielnica III Prądnik Czerwony",
+      "latitude": 50.086372,
+      "longitude": 19.973438
+    },
+    {
+      "district": "Dzielnica IV Prądnik Biały",
+      "latitude": 50.100822,
+      "longitude": 19.918159
+    },
+    {
+      "district": "Dzielnica V Krowodrza",
+      "latitude": 50.071753,
+      "longitude": 19.916253
+    },
+    {
+      "district": "Dzielnica VI Bronowice",
+      "latitude": 50.08245,
+      "longitude": 19.872206
+    },
+    {
+      "district": "Dzielnica XI Podgórze Duchackie",
+      "latitude": 50.013409,
+      "longitude": 19.965485
+    },
+    {
+      "district": "Dzielnica XIV Czyżyny",
+      "latitude": 50.06573,
+      "longitude": 20.010668
+    },
+    {
+      "district": "Dzielnica XV Mistrzejowice",
+      "latitude": 50.097953,
+      "longitude": 20.006938
+    },
+    {
+      "district": "Dzielnica XVII Wzgórza Krzeszławickie",
+      "latitude": 50.100725,
+      "longitude": 20.09077
+    }
+  ]
+}
