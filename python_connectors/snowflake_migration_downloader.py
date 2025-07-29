@@ -4,20 +4,24 @@ import snowflake.connector
 from datetime import timedelta
 import yaml
 import snowflake.connector
+from pathlib import Path
 
 # Load config.yml
-with open("config.yml", "r") as f:
+with open(Path(__file__).parent / "config.yml", "r") as f:
     cfg = yaml.safe_load(f)
 
 sf = cfg["snowflake"]
 
-SCHEMAS = ['SCHEDULE', 'TRIP_UPDATES']
-OUTPUT_DIR = './snowflake_exports'
+SF_DATABASE = 'GTFS_TEST'
+SCHEMAS = [
+    # 'SCHEDULE', 
+    'TRIP_UPDATES'
+    ]
+OUTPUT_DIR = 'g:\Archiwum\Projekcik\snowflake_exports'
 MAX_SIZE_MB = 50
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-
     conn = snowflake.connector.connect(
         user=sf["user"],
         password=sf["password"],
@@ -27,6 +31,8 @@ def main():
     )
     cs = conn.cursor()
 
+
+
     for schema in SCHEMAS:
         print(f"\n--- Schema: {schema}")
         schema_dir = os.path.join(OUTPUT_DIR, schema)
@@ -35,7 +41,7 @@ def main():
         # Get table names and their sizes
         cs.execute(f"""
             SELECT table_name, bytes
-            FROM {SF_DATABASE}.information_schema.tables
+            FROM {sf["database"]}.information_schema.tables
             WHERE table_schema = %s AND table_type = 'BASE TABLE'
         """, (schema,))
         tables = cs.fetchall()

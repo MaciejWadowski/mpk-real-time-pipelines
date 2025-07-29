@@ -14,15 +14,18 @@ import re
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
+import yaml
+from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Local directory with exported CSVs
-EXPORTS_DIR = './snowflake_exports'
+EXPORTS_DIR = 'g:\Archiwum\Projekcik\snowflake_exports'
+SF_DATABASE = 'GTFS_TEST'
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Load config.yml
-with open("config.yml", "r") as f:
+with open(Path(__file__).parent / "config.yml", "r") as f:
     cfg = yaml.safe_load(f)
 
 sf = cfg["snowflake"]
