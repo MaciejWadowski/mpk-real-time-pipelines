@@ -1,0 +1,24 @@
+{
+  "start_date": "2025-05-21",
+  "end_date": "2025-07-21",
+  "locations": [
+    { "district": "Stare Miasto (I)",             "latitude": 50.061389, "longitude": 19.937222 },
+    { "district": "Grzegórzki (II)",               "latitude": 50.051389, "longitude": 19.957778 },
+    { "district": "Prądnik Czerwony (III)",        "latitude": 50.079167, "longitude": 19.961667 },
+    { "district": "Prądnik Biały (IV)",            "latitude": 50.085278, "longitude": 19.884444 },
+    { "district": "Krowodrza (V)",                 "latitude": 50.063611, "longitude": 19.924722 },
+    { "district": "Bronowice (VI)",                "latitude": 50.085833, "longitude": 19.908333 },
+    { "district": "Zwierzyniec (VII)",             "latitude": 50.056944, "longitude": 19.905556 },
+    { "district": "Dębniki (VIII)",                "latitude": 50.021111, "longitude": 19.893333 },
+    { "district": "Łagiewniki-Borek Fałęcki (IX)", "latitude": 50.013333, "longitude": 19.951111 },
+    { "district": "Swoszowice (X)",                "latitude": 49.972778, "longitude": 19.937778 },
+    { "district": "Podgórze Duchackie (XI)",       "latitude": 50.024167, "longitude": 19.939444 },
+    { "district": "Bieżanów-Prokocim (XII)",       "latitude": 50.018056, "longitude": 19.969167 },
+    { "district": "Podgórze (XIII)",               "latitude": 50.042500, "longitude": 19.948056 },
+    { "district": "Czyżyny (XIV)",                 "latitude": 50.080556, "longitude": 20.015556 },
+    { "district": "Mistrzejowice (XV)",            "latitude": 50.085556, "longitude": 20.071111 },
+    { "district": "Bieńczyce (XVI)",               "latitude": 50.108333, "longitude": 20.081389 },
+    { "district": "Wzgórza Krzesławickie (XVII)",  "latitude": 50.098056, "longitude": 20.106667 },
+    { "district": "Nowa Huta (XVIII)",             "latitude": 50.085556, "longitude": 20.190556 }
+  ]
+}
