@@ -28,7 +28,16 @@ SELECT
     C.STOP_ID, 
     C.STOP_LAT, 
     C.STOP_LON,
-    E.EVENT_DATE,
+    IFF(
+         SPLIT_PART(A.ARRIVAL_TIME, ':', '0') > 23,
+         TO_CHAR(DATEADD(day, 1, TO_DATE(E.EVENT_DATE, 'YYYYMMDD'))::DATE, 'YYYYMMDD'),
+         E.EVENT_DATE
+    ) AS EVENT_DATE,
+    IFF(
+         SPLIT_PART(A.ARRIVAL_TIME, ':', '0') > 23,
+         TRUE,
+         FALSE
+    ) AS IS_NIGHT_TRIP,
     A.LOAD_TIMESTAMP
 FROM {{ source('schedule', 'stop_times') }} A
 JOIN {{ source('schedule', 'trips') }} B
