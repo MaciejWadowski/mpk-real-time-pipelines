@@ -26,6 +26,7 @@ SELECT
     S.LOAD_TIMESTAMP AS SCHEDULE_TIMESTAMP
 FROM NEXT_STOP as N 
 JOIN {{ ref('trips_schedule_table') }} AS S
+JOIN {{ ref('trips_schedule_table') }} AS S
     ON N.TRIP_ID = S.TRIP_ID 
     AND N.MODE=S.MODE 
     AND N.STOP_ID=S.STOP_ID 
