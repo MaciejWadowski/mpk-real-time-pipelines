@@ -50,7 +50,6 @@ def fetch_tomtom_traffic_intensity(lat: float, lon: float, api_key: str) -> dict
             
     data = response.json()
     
-    # Extract relevant information
     current_speed = data['flowSegmentData']['currentSpeed'] # Current average speed in km/h on given road segment
     free_flow_speed = data['flowSegmentData']['freeFlowSpeed'] # Ideal speed in km/h on a given road segment
     current_travel_time = data['flowSegmentData']['currentTravelTime'] # Current travel time in seconds on a given road segment
@@ -66,29 +65,25 @@ def fetch_tomtom_traffic_intensity(lat: float, lon: float, api_key: str) -> dict
     }
 
 def fetch_gtfs_stops_from_snowflake(logical_date: DateTime) -> list[dict[str, Any]]:
-        """
-        Downloads distinct stop names and their coordinates from Snowflake for the given logical date.
-        """
-        query_date = logical_date.format("YYYY-MM-DD")
-        query = f"""
-            SELECT DISTINCT STOP_NAME, max(stop_lat) as stop_lat, min(stop_lon) as stop_lon
-            FROM GTFS_TEST.SCHEDULE.STOPS
-            WHERE to_date(load_timestamp) = '{query_date}'
-            GROUP BY STOP_NAME
-        """
-        hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
-        results = hook.get_records(query)
+    query_date = logical_date.format("YYYY-MM-DD")
+    query = f"""
+        SELECT DISTINCT STOP_NAME, max(stop_lat) as stop_lat, min(stop_lon) as stop_lon
+        FROM GTFS_TEST.SCHEDULE.STOPS
+        WHERE to_date(load_timestamp) = '{query_date}'
+        GROUP BY STOP_NAME
+    """
+    hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
+    results = hook.get_records(query)
 
-        return [
-            {"STOP_NAME": row[0], "stop_lat": row[1], "stop_lon": row[2]}
-            for row in results
-        ]
+    return [
+        {"STOP_NAME": row[0], "stop_lat": row[1], "stop_lon": row[2]}
+        for row in results
+    ]
 
 
 def create_table_if_not_exists() -> None:
     hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
     table = "GTFS_TEST.SCHEDULE.TRAFFIC_INTENSITY"
-        # Create table if not exists
     create_table_sql = f"""
     CREATE TABLE IF NOT EXISTS {table} (
             STOP_NAME STRING,
@@ -105,22 +100,18 @@ def create_table_if_not_exists() -> None:
     hook.run(create_table_sql)
 
 def insert_traffic_data_to_snowflake(traffic_data: list[dict[str, Any]]) -> None:
-    """
-    Inserts the result traffic_data into Snowflake. Creates the table if it does not exist.
-    """
     if traffic_data:
         hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
-        # Prepare insert statement
+
         insert_sql = f"""
         INSERT INTO GTFS_TEST.SCHEDULE.TRAFFIC_INTENSITY (
             STOP_NAME, stop_lat, stop_lon, current_speed, free_flow_speed,
             current_travel_time, free_flow_travel_time, confidence, load_timestamp
         ) VALUES
         """
-        values = []
-        for row in traffic_data:
-            values.append(
-                f"""(
+
+        values = [
+            f"""(
                     '{row["STOP_NAME"]}',
                     {row["stop_lat"]},
                     {row["stop_lon"]},
@@ -130,8 +121,10 @@ def insert_traffic_data_to_snowflake(traffic_data: list[dict[str, Any]]) -> None
                     {row["free_flow_travel_time"]},
                     {row["confidence"]},
                     '{row["load_timestamp"]}'
-                )"""
-            )
+            )"""
+            for row in traffic_data
+        ]
+
         insert_sql += ",\n".join(values)
         hook.run(insert_sql)
         
@@ -180,7 +173,5 @@ with DAG(
     def ingest_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
         return process_traffic_indensity(stops=stops, logical_date=logical_date)
         
-    
-
     stops = fetch_gtfs_stops()
     ingest_traffic_intensity(stops=stops, logical_date="{{ logical_date }}")
