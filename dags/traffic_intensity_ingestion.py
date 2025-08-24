@@ -129,7 +129,7 @@ def insert_traffic_data_to_snowflake(traffic_data: list[dict[str, Any]]) -> None
         hook.run(insert_sql)
         
 
-def process_traffic_indensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
+def process_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
     batch_size = 100
     total_stops = len(stops)
     num_batches = ceil(total_stops / batch_size)
@@ -171,7 +171,7 @@ with DAG(
 
     @task
     def ingest_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
-        return process_traffic_indensity(stops=stops, logical_date=logical_date)
+        return process_traffic_intensity(stops=stops, logical_date=logical_date)
         
     stops = fetch_gtfs_stops()
     ingest_traffic_intensity(stops=stops, logical_date="{{ logical_date }}")
