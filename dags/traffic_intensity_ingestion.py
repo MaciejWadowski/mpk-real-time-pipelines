@@ -75,7 +75,6 @@ def fetch_gtfs_stops_from_snowflake(logical_date: DateTime) -> list[dict[str, An
             FROM GTFS_TEST.SCHEDULE.STOPS
             WHERE to_date(load_timestamp) = '{query_date}'
             GROUP BY STOP_NAME
-            limit 550
         """
         hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
         results = hook.get_records(query)
@@ -137,7 +136,7 @@ def insert_traffic_data_to_snowflake(traffic_data: list[dict[str, Any]]) -> None
         hook.run(insert_sql)
         
 
-def ingest_traffic_intensity_data_to_snowflake(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
+def process_traffic_indensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
     batch_size = 100
     total_stops = len(stops)
     num_batches = ceil(total_stops / batch_size)
@@ -179,7 +178,7 @@ with DAG(
 
     @task
     def ingest_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
-        return ingest_traffic_intensity_data_to_snowflake(stops=stops, logical_date=logical_date)
+        return process_traffic_indensity(stops=stops, logical_date=logical_date)
         
     
 
