@@ -114,5 +114,5 @@ def process_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTim
             }
             for stop in batch_stops
         ]
-        insert_traffic_data_to_snowflake(traffic_data)
+        insert_traffic_data_to_snowflake(traffic_data, hook)
         print(f"Inserted batch {batch_num + 1}/{num_batches} ({len(batch_stops)} stops)")
