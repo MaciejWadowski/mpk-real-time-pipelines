@@ -15,6 +15,6 @@
   "mounts": [
     "source=${localWorkspaceFolder}/notebooks,target=/home/jovyan/work/notebooks,type=bind"
   ],
-  "postCreateCommand": "pip install --upgrade pip && pip install dbt-snowflake==1.9.4 gtfs_kit gtfs-realtime-bindings",
+  "postCreateCommand": "pip install --upgrade pip && pip install dbt-snowflake==1.9.4 gtfs_kit gtfs-realtime-bindings snowflake-connector-python",
   "postStartCommand": "jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --NotebookApp.token=''"
 }
