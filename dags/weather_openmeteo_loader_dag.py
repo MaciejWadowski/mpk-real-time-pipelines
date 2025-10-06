@@ -1,14 +1,16 @@
 from __future__ import annotations
 from datetime import datetime, date, timedelta
-import json
+import logging
 from pathlib import Path
-import re
 
 import requests
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
+
+# ====== LOGGER ======
+logger = logging.getLogger("airflow.task")
 
 # ====== CONFIG / LOCATIONS ======
 LOCATIONS = [
@@ -56,10 +58,8 @@ SNOWFLAKE_CONN_ID = "my_snowflake_conn"
 def ymd(d: date) -> str:
     return d.strftime("%Y-%m-%d")
 
-def safe_sql_string(s: str) -> str:
-    return s.replace("'", "''")
-
 def create_schema_and_tables(conn):
+    logger.info("Ensuring schema and tables exist: %s.%s", DB, SCHEMA)
     cur = conn.cursor()
     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB}.{SCHEMA};")
     cur.execute(f"""
@@ -94,6 +94,7 @@ def create_schema_and_tables(conn):
       );
     """)
     cur.close()
+    logger.info("Schema and tables ready")
 
 def fetch_open_meteo(lat: float, lon: float, start_date: str, end_date: str):
     params = {
@@ -105,8 +106,10 @@ def fetch_open_meteo(lat: float, lon: float, start_date: str, end_date: str):
         "end_date": end_date,
         "models": "best_match"
     }
+    logger.info("Requesting Open-Meteo for %s,%s from %s to %s", lat, lon, start_date, end_date)
     r = requests.get(API_URL, params=params, timeout=60)
     r.raise_for_status()
+    logger.info("Open-Meteo response OK: %s rows (hourly time length)", len(r.json().get("hourly", {}).get("time", [])))
     return r.json()
 
 def build_hourly_records(name: str, lat: float, lon: float, api_json: dict):
@@ -147,7 +150,9 @@ def build_min15_records(name: str, lat: float, lon: float, api_json: dict):
 
 def insert_many_snowflake(conn, table: str, cols: list[str], records: list[dict]):
     if not records:
+        logger.info("No records to insert into %s", table)
         return
+    logger.info("Inserting %s records into %s", len(records), table)
     cur = conn.cursor()
     cols_str = ", ".join(cols)
     placeholders = ", ".join(["%s"] * len(cols))
@@ -158,19 +163,21 @@ def insert_many_snowflake(conn, table: str, cols: list[str], records: list[dict]
         tuples.append(tup)
     cur.executemany(sql, tuples)
     cur.close()
+    logger.info("Inserted %s records into %s", len(records), table)
 
 # ====== DAG TASK ======
 def run_fetch_and_load(**context):
     """
-    - Determine global start_date = two months ago, end_date = today
-    - For each location, check max existing day in HOURLY_WEATHER for that district,
-      safely handling missing schema/table by creating them or treating as empty.
-    - Fetch missing data from Open-Meteo and insert.
+    - Compute global start_date = two months ago, end_date = today
+    - For each location, check max existing day in HOURLY_WEATHER safely
+    - Fetch missing data from Open-Meteo and insert
     """
     today = date.today()
     two_months_ago = today - timedelta(days=60)
     global_start = two_months_ago
     global_end = today
+
+    logger.info("DAG run date: %s. Global window: %s -> %s", today, global_start, global_end)
 
     hook = SnowflakeHook(snowflake_conn_id=SNOWFLAKE_CONN_ID)
     conn = hook.get_conn()
@@ -189,11 +196,12 @@ def run_fetch_and_load(**context):
         lat = loc["latitude"]
         lon = loc["longitude"]
 
-        # Safe attempt to get the latest existing day; if it fails treat as no rows
+        logger.info("Processing location: %s (%s,%s)", name, lat, lon)
+
+        # Safe attempt to get latest existing day; if it fails treat as no rows
         existing_max_day = None
         try:
             cur = conn.cursor()
-            # parameterized query to avoid SQL injection and quoting issues
             cur.execute(
                 f"SELECT MAX(DATE_TRUNC('day', timestamp)) FROM {HOURLY_TBL} WHERE district_name = %s",
                 (name,)
@@ -203,9 +211,11 @@ def run_fetch_and_load(**context):
             if row and row[0]:
                 existing_max = row[0]
                 existing_max_day = existing_max.date() if isinstance(existing_max, datetime) else existing_max
+                logger.info("Existing max day for %s: %s", name, existing_max_day)
+            else:
+                logger.info("No existing rows found for %s", name)
         except Exception as e:
-            # If the table or schema didn't exist or another SQL error occurred,
-            # treat it as "no existing rows" so we will fetch from global_start.
+            logger.warning("Could not read existing max day for %s: %s", name, e)
             existing_max_day = None
 
         if existing_max_day:
@@ -216,23 +226,37 @@ def run_fetch_and_load(**context):
         fetch_end = global_end
 
         if fetch_start > fetch_end:
+            logger.info("No new data to fetch for %s (fetch_start %s > fetch_end %s)", name, fetch_start, fetch_end)
             continue
 
         start_str = ymd(fetch_start)
         end_str = ymd(fetch_end)
+        logger.info("Fetching data for %s: %s -> %s", name, start_str, end_str)
 
-        api_json = fetch_open_meteo(lat, lon, start_str, end_str)
+        try:
+            api_json = fetch_open_meteo(lat, lon, start_str, end_str)
+        except Exception as e:
+            logger.error("Failed to fetch Open-Meteo for %s: %s", name, e)
+            continue
 
         hourly_recs = build_hourly_records(name, lat, lon, api_json)
         min15_recs = build_min15_records(name, lat, lon, api_json)
 
-        insert_many_snowflake(conn, HOURLY_TBL, hourly_cols, hourly_recs)
-        insert_many_snowflake(conn, MIN15_TBL, min15_cols, min15_recs)
+        logger.info("Fetched %s hourly rows and %s min15 rows for %s", len(hourly_recs), len(min15_recs), name)
+
+        try:
+            insert_many_snowflake(conn, HOURLY_TBL, hourly_cols, hourly_recs)
+            insert_many_snowflake(conn, MIN15_TBL, min15_cols, min15_recs)
+        except Exception as e:
+            logger.error("Failed to insert data for %s into Snowflake: %s", name, e)
+            continue
 
         total_hourly += len(hourly_recs)
         total_min15 += len(min15_recs)
 
     conn.close()
+    logger.info("Total hourly rows inserted: %s", total_hourly)
+    logger.info("Total min15 rows inserted: %s", total_min15)
     return {"hourly_rows": total_hourly, "min15_rows": total_min15}
 
 # ====== DAG DEFINITION ======
@@ -246,7 +270,7 @@ with DAG(
     dag_id="openmeteo_weather_loader",
     default_args=default_args,
     start_date=datetime(2025, 1, 1),
-    schedule_interval=None,
+    schedule_interval="@daily",
     catchup=False,
     max_active_runs=1,
     tags=["open-meteo", "weather", "snowflake"],
