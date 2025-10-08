@@ -14,7 +14,7 @@ sf = cfg["snowflake"]
 
 SF_DATABASE = 'GTFS_TEST'
 SCHEMAS = [
-    # 'SCHEDULE', 
+    'SCHEDULE', 
     'TRIP_UPDATES'
     ]
 OUTPUT_DIR = 'g:\Archiwum\Projekcik\snowflake_exports'
@@ -83,6 +83,7 @@ def export_by_timestamp_chunks(conn, table, out_dir, base_name):
         qry = f"""
             SELECT * FROM {table}
             WHERE LOAD_TIMESTAMP >= '{current}' AND LOAD_TIMESTAMP < '{next_day}'
+            AND LOAD_TIMESTAMP >= '2025-08-01'
         """
         df = pd.read_sql(qry, conn)
         if not df.empty:
