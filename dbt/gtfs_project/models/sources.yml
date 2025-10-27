@@ -16,3 +16,9 @@ sources:
     schema: trip_updates
     tables:
       - name: trip_updates
+  - name: weather_api_staging
+    database: gtfs_test
+    schema: weather_api_staging
+    tables:
+      - name: hourly_weather
+      - name: district_locations

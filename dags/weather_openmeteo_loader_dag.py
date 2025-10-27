@@ -48,20 +48,58 @@ MIN15_FIELDS = [
 # Snowflake target
 DB = "GTFS_TEST"
 SCHEMA = "WEATHER_API_STAGING"
-HOURLY_TBL = f"{DB}.{SCHEMA}.HOURLY_WEATHER"
-MIN15_TBL  = f"{DB}.{SCHEMA}.MINUTELY_15_WEATHER"
+HOURLY_TBL     = f"{DB}.{SCHEMA}.HOURLY_WEATHER"
+MIN15_TBL      = f"{DB}.{SCHEMA}.MINUTELY_15_WEATHER"
+LOCATIONS_TBL  = f"{DB}.{SCHEMA}.DISTRICT_LOCATIONS"
 
 # Snowflake Airflow connection id
 SNOWFLAKE_CONN_ID = "my_snowflake_conn"
+
+# ====== ROMAN HELPERS (no regex) ======
+_ROMAN_MAP_SIMPLE = {
+    'I': 1, 'V': 5, 'X': 10, 'L': 50, 'C': 100, 'D': 500, 'M': 1000,
+    'IV': 4, 'IX': 9, 'XL': 40, 'XC': 90
+}
+
+def extract_roman_in_parens(s: str) -> str | None:
+    """
+    Extract token inside first parentheses if it contains only roman chars.
+    """
+    start = s.find("(")
+    if start == -1:
+        return None
+    end = s.find(")", start + 1)
+    if end == -1:
+        return None
+    token = s[start+1:end].strip()
+    if token and all(ch in "IVXLCDM" for ch in token):
+        return token
+    return None
+
+def roman_to_int_simple(r: str) -> int:
+    """
+    Convert roman like 'XVII' to integer using simple map with subtractive pairs.
+    """
+    i = 0
+    val = 0
+    while i < len(r):
+        if i + 1 < len(r) and r[i:i+2] in _ROMAN_MAP_SIMPLE:
+            val += _ROMAN_MAP_SIMPLE[r[i:i+2]]
+            i += 2
+        else:
+            val += _ROMAN_MAP_SIMPLE[r[i]]
+            i += 1
+    return val
 
 # ====== HELPERS ======
 def ymd(d: date) -> str:
     return d.strftime("%Y-%m-%d")
 
 def create_schema_and_tables(conn):
-    logger.info("Ensuring schema and tables exist: %s.%s", DB, SCHEMA)
+    logger.info("Ensuring schema and core tables exist: %s.%s", DB, SCHEMA)
     cur = conn.cursor()
     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB}.{SCHEMA};")
+
     cur.execute(f"""
       CREATE TABLE IF NOT EXISTS {HOURLY_TBL} (
         district_name       STRING,
@@ -93,8 +131,64 @@ def create_schema_and_tables(conn):
         wind_direction_10m FLOAT
       );
     """)
+    cur.execute(f"""
+      CREATE TABLE IF NOT EXISTS {LOCATIONS_TBL} (
+        district_number  INT,
+        district_name    STRING,
+        latitude         FLOAT,
+        longitude        FLOAT,
+        location         GEOGRAPHY
+      );
+    """)
     cur.close()
     logger.info("Schema and tables ready")
+
+def upsert_locations(conn, locations: list[dict]):
+    """
+    Upsert the in-DAG LOCATIONS list into DISTRICT_LOCATIONS via MERGE using an inline VALUES source.
+    """
+    logger.info("Upserting %s locations into %s", len(locations), LOCATIONS_TBL)
+    cur = conn.cursor()
+
+    values_sql_parts = []
+    for loc in locations:
+        name = loc["district"].replace("'", "''")
+        lat = loc["latitude"]
+        lon = loc["longitude"]
+        roman = extract_roman_in_parens(loc["district"])
+        num = roman_to_int_simple(roman) if roman else None
+        num_lit = "NULL" if num is None else str(num)
+        wkt = f"POINT({lon} {lat})"
+        # Note: ORDER: district_number, district_name, latitude, longitude, location
+        values_sql_parts.append(f"({num_lit}, '{name}', {lat}, {lon}, '{wkt}')")
+
+    values_sql = ",\n".join(values_sql_parts)
+
+    merge_sql = f"""
+    MERGE INTO {LOCATIONS_TBL} tgt
+    USING (
+      SELECT
+        COLUMN1::INT   AS district_number,
+        COLUMN2::STRING AS district_name,
+        COLUMN3::FLOAT AS latitude,
+        COLUMN4::FLOAT AS longitude,
+        TO_GEOGRAPHY(COLUMN5) AS location
+      FROM VALUES
+      {values_sql}
+    ) src
+    ON tgt.district_name = src.district_name
+    WHEN MATCHED THEN UPDATE SET
+      district_number = src.district_number,
+      latitude = src.latitude,
+      longitude = src.longitude,
+      location = src.location
+    WHEN NOT MATCHED THEN INSERT (district_number, district_name, latitude, longitude, location)
+      VALUES (src.district_number, src.district_name, src.latitude, src.longitude, src.location)
+    ;
+    """
+    cur.execute(merge_sql)
+    cur.close()
+    logger.info("Upserted locations into %s", LOCATIONS_TBL)
 
 def fetch_open_meteo(lat: float, lon: float, start_date: str, end_date: str):
     params = {
@@ -109,7 +203,7 @@ def fetch_open_meteo(lat: float, lon: float, start_date: str, end_date: str):
     logger.info("Requesting Open-Meteo for %s,%s from %s to %s", lat, lon, start_date, end_date)
     r = requests.get(API_URL, params=params, timeout=60)
     r.raise_for_status()
-    logger.info("Open-Meteo response OK: %s rows (hourly time length)", len(r.json().get("hourly", {}).get("time", [])))
+    logger.info("Open-Meteo response OK: hourly count=%s", len(r.json().get("hourly", {}).get("time", [])))
     return r.json()
 
 def build_hourly_records(name: str, lat: float, lon: float, api_json: dict):
@@ -167,11 +261,6 @@ def insert_many_snowflake(conn, table: str, cols: list[str], records: list[dict]
 
 # ====== DAG TASK ======
 def run_fetch_and_load(**context):
-    """
-    - Compute global start_date = two months ago, end_date = today
-    - For each location, check max existing day in HOURLY_WEATHER safely
-    - Fetch missing data from Open-Meteo and insert
-    """
     today = date.today()
     two_months_ago = today - timedelta(days=60)
     global_start = two_months_ago
@@ -182,8 +271,11 @@ def run_fetch_and_load(**context):
     hook = SnowflakeHook(snowflake_conn_id=SNOWFLAKE_CONN_ID)
     conn = hook.get_conn()
 
-    # Ensure schema and tables exist before any SELECTs
+    # Ensure schema and all tables exist
     create_schema_and_tables(conn)
+
+    # Upsert locations table from DAG constant
+    upsert_locations(conn, LOCATIONS)
 
     hourly_cols = ["district_name", "latitude", "longitude", "timestamp"] + HOURLY_FIELDS
     min15_cols  = ["district_name", "latitude", "longitude", "timestamp"] + MIN15_FIELDS
