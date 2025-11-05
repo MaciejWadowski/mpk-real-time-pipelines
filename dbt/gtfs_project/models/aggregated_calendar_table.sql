@@ -6,7 +6,7 @@ WITH first_date AS (
   FROM {{ source('schedule', 'calendar') }}
 ),
 max_date AS (
-  SELECT MIN(TO_DATE(END_DATE, 'YYYYMMDD')) AS max_dt
+  SELECT MAX(TO_DATE(END_DATE, 'YYYYMMDD')) AS max_dt
   FROM {{ source('schedule', 'calendar') }}
 ),
 date_series AS (
