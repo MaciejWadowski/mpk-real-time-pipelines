@@ -139,13 +139,13 @@ def get_tables_with_sizes(conn, schema):
         cs.close()
 
 
-def atomic_write_parquet(df: pd.DataFrame, final_path: str):
+def atomic_write_parquet(df: pd.DataFrame, final_path: str, mode: str = 'incremental'):
     """
     Write parquet atomically: write to .part file in same folder then rename.
-    If final_path already exists, skip and return False.
+    If final_path already exists and mode is incremental, skip and return False.
     Returns True if file was written, False if skipped.
     """
-    if os.path.exists(final_path):
+    if os.path.exists(final_path) and mode == 'incremental':
         # Already downloaded previously; skip
         print(f"    → Skipping (exists): {final_path}")
         return False
@@ -177,13 +177,9 @@ def read_sql_with_retry(query: str, conn):
 
 
 def export_full_table(conn, table_ref, out_path):
-    # Skip if final file exists
-    if os.path.exists(out_path):
-        print(f"    → Full export skipped (file already exists): {out_path}")
-        return
     df = read_sql_with_retry(f"SELECT * FROM {table_ref}", conn)
     if not df.empty:
-        atomic_write_parquet(df, out_path)
+        atomic_write_parquet(df, out_path, 'overwrite')
     else:
         print(f"    → Full export: no rows for {table_ref}")
 
@@ -290,32 +286,36 @@ def main():
                 table_ref = f"{SF_DATABASE}.{schema}.{table_name}"
                 base_path = os.path.join(schema_dir, table_name)
 
+                # Check if table has LOAD_TIMESTAMP column
+                cs = conn.cursor()
+                try:
+                    cs.execute(f"SELECT column_name FROM information_schema.columns WHERE table_schema = %s AND table_name = %s", (schema, table_name))
+                    columns = [row[0] for row in cs.fetchall()]
+                finally:
+                    cs.close()
+
+                has_load_timestamp = "LOAD_TIMESTAMP" in columns
+
                 if mode == "fresh":
-                    if last_migration is None:
-                        print("    → No last migration timestamp found, doing full export for this table.")
-                        if size_mb <= MAX_SIZE_MB:
-                            out_path = base_path + ".parquet"
-                            export_full_table(conn, table_ref, out_path)
-                        else:
-                            export_by_timestamp_chunks(conn, table_ref, schema_dir, table_name)
+                    if not has_load_timestamp:
+                        # No LOAD_TIMESTAMP column, always do full export regardless of size
+                        out_path = base_path + ".parquet"
+                        export_full_table(conn, table_ref, out_path)
                     else:
-                        if size_mb <= MAX_SIZE_MB:
-                            out_path = base_path + ".parquet"
-                            qry = f"SELECT * FROM {table_ref} WHERE LOAD_TIMESTAMP > '{last_migration.isoformat()}'"
-                            try:
-                                df = read_sql_with_retry(qry, conn)
-                                if not df.empty:
-                                    timestamp_suffix = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-                                    final_file = base_path + f"_{timestamp_suffix}.parquet"
-                                    # skip if final_file exists (unlikely) else write atomically
-                                    atomic_write_parquet(df, final_file)
-                                else:
-                                    print("    → No new rows since last migration")
-                            except Exception as e:
-                                print(f"    ⚠ Incremental query failed: {e}; falling back to full export")
+                        if last_migration is None:
+                            print("    → No last migration timestamp found, doing full export for this table.")
+                            if size_mb <= MAX_SIZE_MB:
+                                out_path = base_path + ".parquet"
                                 export_full_table(conn, table_ref, out_path)
+                            else:
+                                export_by_timestamp_chunks(conn, table_ref, schema_dir, table_name)
                         else:
-                            export_incremental_table(conn, table_ref, schema_dir, table_name, last_migration)
+                            if size_mb <= MAX_SIZE_MB:
+                                print("    → Table size is below the limit, doing full export for this table.")
+                                out_path = base_path + ".parquet"
+                                export_full_table(conn, table_ref, out_path)
+                            else:
+                                export_incremental_table(conn, table_ref, schema_dir, table_name, last_migration)
                 else:  # full
                     if size_mb <= MAX_SIZE_MB:
                         out_path = base_path + ".parquet"
