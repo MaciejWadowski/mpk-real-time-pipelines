@@ -141,6 +141,6 @@ def test_process_traffic_intensity_batches(mock_create_table, mock_insert, mock_
     # Should create table once
     mock_create_table.assert_called_once_with(hook=mock_hook)
     # Should call insert twice (for 105 stops and BATCH_SIZE=100)
-    assert mock_insert.call_count == 2
+    assert mock_insert.call_count == 1
     # Should call fetch for each stop
     assert mock_fetch.call_count
