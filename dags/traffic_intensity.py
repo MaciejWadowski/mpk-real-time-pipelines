@@ -6,6 +6,99 @@ import datetime
 from pendulum import DateTime
 
 BATCH_SIZE = 100
+STOPS_INCLUDED = set([
+    "Muzeum Narodowe",
+    "Jubilat",
+    "Nowy Kleparz",
+    "Rondo Grunwaldzkie",
+    "Konopnickiej",
+    "AGH / UR",
+    "Plac Inwalidów",
+    "Rondo Matecznego",
+    "Kamieńskiego",
+    "Prokocim Szpital",
+    "Opolska Estakada",
+    "Czarnowiejska",
+    "Bronowice SKA",
+    "Politechnika",
+    "Kamieńskiego Wiadukt",
+    "Bieżanowska",
+    "Biskupa Prandoty",
+    "Bonarka",
+    "Ludwinów",
+    "Dworzec Główny Zachód",
+    "Makowskiego",
+    "Jerzmanowskiego",
+    "UR al. 29 Listopada",
+    "Rondo Barei",
+    "Łobzów SKA",
+    "Azory",
+    "Radio Kraków",
+    "Zajezdnia Wola Duchacka",
+    "Rondo Ofiar Katynia",
+    "Przybyszewskiego",
+    "Kawiory",
+    "Wola Duchacka",
+    "Miasteczko Studenckie AGH",
+    "Dobrego Pasterza",
+    "Wlotowa",
+    "Cmentarz Rakowicki Zachód",
+    "Bujaka",
+    "Os. Oświecenia",
+    "Park Wodny",
+    "Rondo Mogilskie",
+    "Góra Borkowska",
+    "Teatr Ludowy",
+    "Mistrzejowice",
+    "Rondo Młyńskie",
+    "Różyckiego",
+    "Makowa",
+    "Malborska",
+    "Ks. Meiera",
+    "Wiślicka",
+    "Miechowity",
+    "Dworzec Główny Wschód",
+    "Pilotów",
+    "Łagiewniki",
+    "Zarzecze",
+    "Chopina",
+    "Halszki",
+    "Os. Podwawelskie",
+    "Krowoderskich Zuchów",
+    "Miśnieńska",
+    "Os. Złotego Wieku",
+    "Teatr Słowackiego",
+    "Judyma",
+    "Kapelanka",
+    "Mackiewicza",
+    "Biprostal",
+    "Mazowiecka",
+    "Marchołta",
+    "Kurzei",
+    "Łempickiego",
+    "Słomiana",
+    "Kobierzyńska",
+    "Banacha",
+    "Imbramowska",
+    "Armii Krajowej",
+    "Narzymskiego",
+    "Surzyckiego",
+    "Lindego",
+    "Olsza II",
+    "Stojałowskiego",
+    "Os. Kurdwanów",
+    "Pszenna",
+    "Beskidzka",
+    "Struga",
+    "Rondo Piastowskie",
+    "Sławka",
+    "Rondo Hipokratesa",
+    "UR Balicka",
+    "Młynówka SKA",
+    "Aleja Róż"
+    ]
+)
+
 
 def fetch_tomtom_traffic_intensity(lat: float, lon: float, api_key: str) -> dict[str, Any]:
     """
@@ -37,10 +130,17 @@ def fetch_tomtom_traffic_intensity(lat: float, lon: float, api_key: str) -> dict
 def get_gtfs_stops_from_snowflake(logical_date: DateTime, hook) -> list[dict[str, Any]]:
     query_date = logical_date.format("YYYY-MM-DD")
     query = f"""
-        SELECT DISTINCT STOP_NAME, max(stop_lat) as stop_lat, min(stop_lon) as stop_lon
-        FROM GTFS_TEST.SCHEDULE.STOPS
-        WHERE to_date(load_timestamp) = '{query_date}'
-        GROUP BY STOP_NAME
+        SELECT STOP_NAME, stop_lat, stop_lon
+        FROM (
+            SELECT
+                STOP_NAME,
+                stop_lat,
+                stop_lon,
+                ROW_NUMBER() OVER (PARTITION BY STOP_NAME ORDER BY stop_lat, stop_lon) AS rn
+            FROM GTFS_TEST.SCHEDULE.STOPS
+            WHERE to_date(load_timestamp) = (SELECT MAX(to_date(load_timestamp)) FROM GTFS_TEST.SCHEDULE.STOPS)
+        ) t
+        WHERE rn = 1
     """
     results = hook.get_records(query)
     return [
@@ -91,16 +191,17 @@ def insert_traffic_data_to_snowflake(traffic_data: list[dict[str, Any]], hook) -
     insert_sql += ",\n".join(values)
     hook.run(insert_sql)
 
-def process_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime, api_key: str, hook) -> None:
+def process_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime, api_keys: list[str], hook) -> None:
     """
     Processes stops in batches, fetches traffic intensity, and inserts into Snowflake.
     """
-    total_stops = len(stops)
-    num_batches = ceil(total_stops / BATCH_SIZE)
+    stops = [stop for stop in stops if stop["STOP_NAME"].strip() in STOPS_INCLUDED and stop["stop_lat"] > 0 and stop["stop_lon"] > 0]
     create_traffic_intensity_table_if_not_exists(hook=hook)
-    for batch_num in range(num_batches):
-        batch_stops = stops[batch_num * BATCH_SIZE : (batch_num + 1) * BATCH_SIZE]
-        traffic_data = [
+    traffic_data = []
+    for batch_num in range(len(stops)):
+        stop = stops[batch_num]
+        api_key = api_keys[batch_num % len(api_keys)]
+        traffic_data.append(
             {
                 "STOP_NAME": stop["STOP_NAME"],
                 "stop_lat": stop["stop_lat"],
@@ -112,7 +213,6 @@ def process_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTim
                 ),
                 "load_timestamp": logical_date.format("YYYY-MM-DD")
             }
-            for stop in batch_stops
-        ]
-        insert_traffic_data_to_snowflake(traffic_data, hook)
-        print(f"Inserted batch {batch_num + 1}/{num_batches} ({len(batch_stops)} stops)")
+        )
+    insert_traffic_data_to_snowflake(traffic_data, hook)
+# %%

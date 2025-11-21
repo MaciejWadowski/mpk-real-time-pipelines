@@ -10,6 +10,8 @@ from traffic_intensity import *
 
 SNOWFLAKE_CONN_ID = "my_snowflake_conn"
 TOMTOM_API_KEY_VAR = "tomtom_api_key_secret"
+TOMTOM_API_KEY_SECOND = "tomtom_api_key_secret_2"
+
 
 default_args = {
     'owner': 'airflow',
@@ -23,7 +25,7 @@ with DAG(
     dag_id='traffic_intensity_ingestion',
     default_args=default_args,
     description='Ingest traffic intensity data from TomTom API',
-    schedule_interval="@daily",
+    schedule_interval=" */15 7-20 * * *",
     catchup=False,
     params={"example_param": "default_value"}
 ) as dag:
@@ -37,7 +39,8 @@ with DAG(
     def ingest_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
         hook = SnowflakeHook(snowflake_conn_id=SNOWFLAKE_CONN_ID)
         api_key = Variable.get(TOMTOM_API_KEY_VAR)
-        return process_traffic_intensity(stops=stops, logical_date=logical_date, hook=hook, api_key=api_key)
+        second_api_key = Variable.get(TOMTOM_API_KEY_SECOND)
+        return process_traffic_intensity(stops=stops, logical_date=logical_date, hook=hook, api_keys=[api_key, second_api_key])
         
     stops = fetch_gtfs_stops()
     ingest_traffic_intensity(stops=stops, logical_date="{{ logical_date }}")
