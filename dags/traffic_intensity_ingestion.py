@@ -9,9 +9,7 @@ from math import ceil
 from traffic_intensity import *
 
 SNOWFLAKE_CONN_ID = "my_snowflake_conn"
-TOMTOM_API_KEY_VAR = "tomtom_api_key_secret"
-TOMTOM_API_KEY_SECOND = "tomtom_api_key_secret_2"
-
+TOMTOM_API_KEY_VAR = "tom_tom_api_keys"
 
 default_args = {
     'owner': 'airflow',
@@ -38,9 +36,8 @@ with DAG(
     @task
     def ingest_traffic_intensity(stops: list[dict[str, Any]], logical_date: DateTime) -> None:
         hook = SnowflakeHook(snowflake_conn_id=SNOWFLAKE_CONN_ID)
-        api_key = Variable.get(TOMTOM_API_KEY_VAR)
-        second_api_key = Variable.get(TOMTOM_API_KEY_SECOND)
-        return process_traffic_intensity(stops=stops, logical_date=logical_date, hook=hook, api_keys=[api_key, second_api_key])
+        api_keys = Variable.get(TOMTOM_API_KEY_VAR, deserialize_json=True)
+        return process_traffic_intensity(stops=stops, logical_date=logical_date, hook=hook, api_keys=api_keys)
         
     stops = fetch_gtfs_stops()
     ingest_traffic_intensity(stops=stops, logical_date="{{ logical_date }}")
