@@ -218,8 +218,7 @@ def ingest_trip_updates_to_snowflake(**kwargs):
     trip_updates_sources = [
         ("T", "https://gtfs.ztp.krakow.pl/TripUpdates_T.pb"),
         ("A", "https://gtfs.ztp.krakow.pl/TripUpdates_A.pb"),
-        ("M", "https://gtfs.ztp.krakow.pl/TripUpdates_M.pb"),
-        ("TR", "https://gtfs.ztp.krakow.pl/TripUpdates.pb")
+        ("M", "https://gtfs.ztp.krakow.pl/TripUpdates_M.pb")
     ]
     
     all_trip_updates = []
@@ -249,8 +248,7 @@ def ingest_vehicle_positions_to_snowflake(**kwargs):
     vehicle_positions_sources = [
         ("T", "https://gtfs.ztp.krakow.pl/VehiclePositions_T.pb"),
         ("A", "https://gtfs.ztp.krakow.pl/VehiclePositions_A.pb"),
-        ("M", "https://gtfs.ztp.krakow.pl/VehiclePositions_M.pb"),
-        ("TR", "https://gtfs.ztp.krakow.pl/VehiclePositions.pb")
+        ("M", "https://gtfs.ztp.krakow.pl/VehiclePositions_M.pb")
     ]
 
     all_positions = []
