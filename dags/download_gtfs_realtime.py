@@ -276,7 +276,7 @@ with DAG(
     dag_id='gtfs_load_gtfs_realtime',
     default_args=default_args,
     description='Load GTFS‑Realtime trip updates and vehicle positions',
-    schedule_interval="*/5 * * * *",  # Run every 5 minutes
+    schedule_interval="*/3 * * * *",  # Run every 5 minutes
     catchup=False,
 ) as dag:
     
