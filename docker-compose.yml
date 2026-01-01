@@ -39,6 +39,7 @@ services:
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS=False
+      - AIRFLOW_CONN_MY_SNOWFLAKE_CONN=snowflake://${DBT_USER}:${DBT_PASSWORD}@${DBT_ACCOUNT}/${DBT_DATABASE:-GTFS_TEST}/${DBT_SCHEMA:-GTFS_UPLOADER_ROLE}?warehouse=${DBT_WAREHOUSE:-COMPUTE_WH}&role=${DBT_ROLE}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs

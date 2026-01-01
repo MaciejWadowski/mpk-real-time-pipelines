@@ -19,21 +19,21 @@ jobs:
       DBT_TARGET: ${{ secrets.DBT_TARGET }}
       DBT_SCHEMA: ${{ secrets.DBT_SCHEMA }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 
 
-      - name: Generate dbt profiles.yml
+      - name: Generate dbt profiles.yml in repo/dbt
         run: |
-          mkdir -p $HOME/.dbt
+          mkdir -p dbt
           if ! command -v envsubst >/dev/null 2>&1; then
             python - <<'PY'
           import os
           from string import Template
           t = Template(open('dbt/test-profiles.yml').read())
-          open(os.path.expanduser('~/.dbt/profiles.yml'),'w').write(t.safe_substitute(os.environ))
+          open('dbt/profiles.yml','w').write(t.safe_substitute(os.environ))
           PY
-                    else
-                      envsubst < dbt/test-profiles.yml > $HOME/.dbt/profiles.yml
-                    fi
+          else
+            envsubst < dbt/test-profiles.yml > dbt/profiles.yml
+          fi
 
       - name: Pull images (best-effort)
         run: docker compose -f docker-compose.yml pull || true
