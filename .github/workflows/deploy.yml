@@ -38,6 +38,11 @@ jobs:
       - name: Pull images (best-effort)
         run: docker compose -f docker-compose.yml pull || true
 
+      - name: Ensure repo-local Airflow dirs
+        run: |
+          mkdir -p ./logs ./dags ./plugins
+          chmod -R 0777 ./logs ./dags ./plugins
+
       - name: Deploy (build & run)
         run: docker compose -f docker-compose.yml up -d --build --remove-orphans
 
