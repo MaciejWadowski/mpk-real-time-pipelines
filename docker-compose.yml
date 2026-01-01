@@ -40,7 +40,7 @@ services:
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS=False
       - AIRFLOW_UID=1000
-      - AIRFLOW_CONN_MY_SNOWFLAKE_CONN=snowflake://${DBT_USER}:${DBT_PASSWORD}@${DBT_ACCOUNT}/${DBT_DATABASE:-GTFS_TEST}/${DBT_SCHEMA:-GTFS_UPLOADER_ROLE}?warehouse=${DBT_WAREHOUSE:-COMPUTE_WH}&role=${DBT_ROLE}
+      - AIRFLOW_CONN_MY_SNOWFLAKE_CONN=snowflake://${DBT_USER}:${DBT_PASSWORD}@${DBT_ACCOUNT}/${DBT_DATABASE}/${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs

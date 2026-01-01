@@ -13,11 +13,13 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
       AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
-      DBT_HOST: ${{ secrets.DBT_HOST }}
       DBT_USER: ${{ secrets.DBT_USER }}
       DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
-      DBT_TARGET: ${{ secrets.DBT_TARGET }}
       DBT_SCHEMA: ${{ secrets.DBT_SCHEMA }}
+      DBT_ACCOUNT: ${{ secrets.DBT_ACCOUNT }}
+      DBT_WAREHOUSE: ${{ secrets.DBT_WAREHOUSE }}
+      DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
+      DBT_ROLE: ${{ secrets.DBT_ROLE }}
     steps:
       - uses: actions/checkout@v4
         with:
