@@ -19,7 +19,9 @@ jobs:
       DBT_TARGET: ${{ secrets.DBT_TARGET }}
       DBT_SCHEMA: ${{ secrets.DBT_SCHEMA }}
     steps:
-      - uses: actions/checkout@v4 
+      - uses: actions/checkout@v4
+        with:
+          clean: false
 
       - name: Generate dbt profiles.yml in repo/dbt
         run: |
