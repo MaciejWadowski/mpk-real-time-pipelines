@@ -1,0 +1,19 @@
+name: Deploy to self-hosted host
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull images (best-effort)
+        run: docker compose -f docker-compose.yml pull || true
+
+      - name: Deploy (build & run)
+        run: docker compose -f docker-compose.yml up -d --build --remove-orphans
+
+      - name: Health / status
+        run: docker compose -f docker-compose.yml ps
