@@ -1,7 +1,9 @@
 name: Deploy to self-hosted host
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - '**'
 
 jobs:
   deploy:
