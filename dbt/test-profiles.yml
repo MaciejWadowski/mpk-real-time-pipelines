@@ -1,13 +1,13 @@
 gtfs_project:
   outputs:
     dev:
-      account: <replace>
-      database: GTFS_TEST
-      password: <replace>
-      role: GTFS_UPLOADER_ROLE
-      schema: SCHEDULE_DATA_MARTS
+      account: "${DBT_ACCOUNT}"
+      database: "${DBT_DATABASE:-GTFS_TEST}"
+      password: "${DBT_PASSWORD}"
+      role: "${DBT_SCHEMA:-GTFS_UPLOADER_ROLE}"
+      schema: "${DBT_SCHEMA:-SCHEDULE_DATA_MARTS}"
       threads: 1
       type: snowflake
-      user: <replace>
-      warehouse: COMPUTE_WH
+      user: "${DBT_USER}"
+      warehouse: "${DBT_WAREHOUSE:-COMPUTE_WH}"
   target: dev

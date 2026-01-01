@@ -8,8 +8,32 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
+    env:
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
+      DBT_HOST: ${{ secrets.DBT_HOST }}
+      DBT_USER: ${{ secrets.DBT_USER }}
+      DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
+      DBT_TARGET: ${{ secrets.DBT_TARGET }}
+      DBT_SCHEMA: ${{ secrets.DBT_SCHEMA }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate dbt profiles.yml
+        run: |
+          mkdir -p $HOME/.dbt
+          if ! command -v envsubst >/dev/null 2>&1; then
+            python - <<'PY'
+          import os
+          from string import Template
+          t = Template(open('dbt/test-profiles.yml').read())
+          open(os.path.expanduser('~/.dbt/profiles.yml'),'w').write(t.safe_substitute(os.environ))
+          PY
+                    else
+                      envsubst < dbt/test-profiles.yml > $HOME/.dbt/profiles.yml
+                    fi
 
       - name: Pull images (best-effort)
         run: docker compose -f docker-compose.yml pull || true
