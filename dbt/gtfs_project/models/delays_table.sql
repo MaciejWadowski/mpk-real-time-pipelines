@@ -1,63 +1,52 @@
 {{ config(materialized='table', alias='DELAYS_TABLE')}}
 
-WITH NEXT_STOP AS (
+WITH RAW_UPDATES AS (
     SELECT 
         trip_id, 
+        mode, 
         stop_id, 
-        CONVERT_TIMEZONE('UTC','Europe/Warsaw', to_timestamp_ntz(IFNULL(arrival, departure)::NUMBER)) AS ACTUAL_ARRIVAL, 
-        MODE, 
-        LOAD_TIMESTAMP,
-        TO_CHAR(CONVERT_TIMEZONE('UTC','Europe/Warsaw', to_timestamp_ntz(IFNULL(arrival, departure)::NUMBER))::DATE, 'YYYYMMDD') AS EVENT_DATE
+        CONVERT_TIMEZONE('UTC', 'Europe/Warsaw', TO_TIMESTAMP_NTZ(IFNULL(arrival, departure)::NUMBER)) AS actual_time,
+        TO_CHAR(actual_time::DATE, 'YYYYMMDD') AS event_date
     FROM {{ source('trip_updates', 'trip_updates') }} 
-        QUALIFY ROW_NUMBER() OVER (PARTITION BY TRIP_ID, MODE, STOP_ID, EVENT_DATE ORDER BY LOAD_TIMESTAMP DESC) = 1
-), JOINED_WITH_SCHEDULE AS (
-SELECT 
-    S.TRIP_ID, 
-    S.STOP_ID,
-    S.STOP_NAME,
-    S.TRIP_HEADSIGN,
-    S.STOP_SEQUENCE,
-    N.ACTUAL_ARRIVAL,
-    S.ROUTE_SHORT_NAME,
-    TO_TIMESTAMP(TO_DATE(S.EVENT_DATE, 'YYYYMMDD') || ' ' || S.ARRIVAL_TIME || '.000') as PLANNED_ARRIVAL,
-    S.MODE,
-    S.EVENT_DATE,
-    N.LOAD_TIMESTAMP,
-    S.LOAD_TIMESTAMP AS SCHEDULE_TIMESTAMP
-FROM NEXT_STOP as N 
-JOIN {{ ref('trips_schedule_table') }} AS S
-    ON N.TRIP_ID = S.TRIP_ID 
-    AND N.MODE=S.MODE 
-    AND N.STOP_ID=S.STOP_ID 
-    AND (
-            (
-                N.event_date = S.event_date
-                AND NOT (
-                            (
-                                HOUR(N.ACTUAL_ARRIVAL) = 23
-                                AND SPLIT_PART(S.ARRIVAL_TIME, ':', '0') = 0
-                            )
-                        OR  (
-                            HOUR(N.ACTUAL_ARRIVAL) = 0
-                            AND SPLIT_PART(S.ARRIVAL_TIME, ':', '0') = 23
-                            )
-                        )
-            )
-            OR  (
-                HOUR(N.ACTUAL_ARRIVAL) = 23
-                AND SPLIT_PART(S.ARRIVAL_TIME, ':', '0') = 0
-                AND N.EVENT_DATE = TO_CHAR(DATEADD(day, -1, TO_DATE(S.EVENT_DATE, 'YYYYMMDD'))::DATE, 'YYYYMMDD')
-            )
-            OR (
-                HOUR(N.ACTUAL_ARRIVAL) = 0
-                AND SPLIT_PART(S.ARRIVAL_TIME, ':', '0') = 23
-                AND S.EVENT_DATE = TO_CHAR(DATEADD(day, -1, TO_DATE(N.EVENT_DATE, 'YYYYMMDD'))::DATE, 'YYYYMMDD')
-            )
+    QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY trip_id, mode, stop_id, TO_CHAR(CONVERT_TIMEZONE('UTC', 'Europe/Warsaw', TO_TIMESTAMP_NTZ(IFNULL(arrival, departure)::NUMBER))::DATE, 'YYYYMMDD')
+        ORDER BY load_timestamp DESC
+    ) = 1
+),
 
-        )
-QUALIFY ROW_NUMBER() 
-        OVER (PARTITION BY S.trip_id, S.stop_id, S.MODE, S.event_date ORDER BY S.LOAD_TIMESTAMP DESC) = 1
-), delays as (
-SELECT *, case when datediff('minute',planned_arrival, actual_arrival) < 0 then 0 else datediff('minute',planned_arrival, actual_arrival) end  as delay FROM JOINED_WITH_SCHEDULE
+COMBINED_STOPS AS (
+    SELECT 
+        s.trip_id, s.mode, s.event_date, s.stop_id, s.stop_sequence,
+        n.actual_time,
+        TO_TIMESTAMP(TO_DATE(s.event_date, 'YYYYMMDD') || ' ' || s.arrival_time) AS planned_time,
+        LISTAGG(s.stop_id, '>') WITHIN GROUP (ORDER BY s.stop_sequence) OVER (PARTITION BY s.trip_id, s.mode, s.event_date) AS planned_route_string,
+        LISTAGG(n.stop_id, '>') WITHIN GROUP (ORDER BY s.stop_sequence) OVER (PARTITION BY s.trip_id, s.mode, s.event_date) AS actual_route_string
+    FROM {{ ref('trips_schedule_table') }} s
+    LEFT JOIN RAW_UPDATES n 
+        ON n.trip_id = s.trip_id 
+        AND n.mode = s.mode 
+        AND n.stop_id = s.stop_id
+        AND (n.event_date = s.event_date OR 
+            (HOUR(n.actual_time) = 23 AND LEFT(s.arrival_time, 2) = '00' AND n.event_date = TO_CHAR(DATEADD(day, -1, TO_DATE(s.event_date, 'YYYYMMDD')), 'YYYYMMDD')) OR
+            (HOUR(n.actual_time) = 0 AND LEFT(s.arrival_time, 2) = '23' AND s.event_date = TO_CHAR(DATEADD(day, -1, TO_DATE(n.event_date, 'YYYYMMDD')), 'YYYYMMDD')))
+    WHERE s.mode <> 'TR'
 )
-select * from delays where mode != 'TR'
+
+SELECT 
+    trip_id,
+    mode,
+    event_date,
+    stop_id AS start_stop_id,
+    stop_sequence AS start_stop_sequence,
+    planned_time AS planned_departure,
+    actual_time AS actual_departure,
+    
+    LEAD(stop_id) OVER (PARTITION BY trip_id, mode, event_date ORDER BY stop_sequence) AS direction_stop_id,
+    LEAD(stop_sequence) OVER (PARTITION BY trip_id, mode, event_date ORDER BY stop_sequence) AS end_stop_sequence,
+    LEAD(planned_time) OVER (PARTITION BY trip_id, mode, event_date ORDER BY stop_sequence) AS planned_arrival,
+    LEAD(actual_time) OVER (PARTITION BY trip_id, mode, event_date ORDER BY stop_sequence) AS actual_arrival,
+
+    MD5(trip_id || event_date || stop_sequence || COALESCE(LEAD(stop_sequence) OVER (PARTITION BY trip_id, mode, event_date ORDER BY stop_sequence)::STRING, 'END')) AS vector_unique_id
+FROM COMBINED_STOPS
+WHERE planned_route_string = actual_route_string
+QUALIFY direction_stop_id IS NOT NULL;
