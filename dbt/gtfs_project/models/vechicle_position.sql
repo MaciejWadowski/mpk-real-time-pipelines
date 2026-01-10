@@ -11,8 +11,8 @@ SELECT
     vp.LOAD_TIMESTAMP,
     vp.TRIP_ID,
     dt.vector_unique_id
-FROM {{ ref('delays_table') }} vp
-INNER JOIN GTFS_TEST.TRIP_UPDATES.DELAY_VECTORS_TABLE dt
+FROM {{ source('trip_updates', 'vehicle_positions') }} vp
+INNER JOIN {{ ref('delays_table') }} dt
     ON vp.TRIP_ID = dt.trip_id 
     AND TO_CHAR(vp.LOAD_TIMESTAMP, 'YYYYMMDD') = dt.event_date
     AND vp.CURRENT_STOP_SEQUENCE = dt.end_stop_sequence
