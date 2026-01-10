@@ -1,4 +1,5 @@
-
+{{ config(materialized='table', alias='VEHICLE_POSITIONS')}}
+    
 SELECT 
     vp.ID AS vehicle_id,
     vp.LATITUDE,
