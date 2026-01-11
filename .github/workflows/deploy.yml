@@ -39,7 +39,6 @@ jobs:
             envsubst < dbt/test-profiles.yml > dbt/profiles.yml
           fi
 
-
       - name: Pull images (best-effort)
         run: docker compose -f docker-compose.yml pull || true
 
@@ -48,14 +47,17 @@ jobs:
           mkdir -p ./logs ./dags ./plugins
 
       - name: Deploy (build & run)
-        run: docker compose -f docker-compose.yml up -d --build --remove-orphans
+        run: |
+          set -euo pipefail
+          echo "Rebuilding Airflow images (no cache) to pick up env/build-arg changes..."
+          docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
+          docker compose -f docker-compose.yml up -d --remove-orphans
 
       - name: Health / status
         run: |
           set -euo pipefail
-          # Timeout and interval can be overridden via env vars (use shell defaults to avoid invalid GH expr)
-          TIMEOUT=${HEALTH_TIMEOUT:-300}
-          INTERVAL=${HEALTH_INTERVAL:-5}
+          TIMEOUT=300
+          INTERVAL=10
           END=$((SECONDS+TIMEOUT))
 
           services=( $(docker compose -f docker-compose.yml ps --services) )
@@ -65,33 +67,14 @@ jobs:
             exit 1
           fi
 
-          echo "Waiting up to ${TIMEOUT}s for services to become healthy (poll interval ${INTERVAL}s)..."
+          N=${#services[@]}
+          echo "Waiting up to ${TIMEOUT}s for ${N} services to report '(healthy)' (interval ${INTERVAL}s)..."
 
           while [ $SECONDS -lt $END ]; do
-            ALL_OK=true
-            for svc in "${services[@]}"; do
-              cid=$(docker compose -f docker-compose.yml ps -q "${svc}") || true
-              if [ -z "${cid}" ]; then
-                echo "Service ${svc} has no container yet";
-                ALL_OK=false; continue
-              fi
-
-              restart_count=$(docker inspect -f '{{.RestartCount}}' "${cid}" 2>/dev/null || echo 0)
-              if [ "${restart_count}" -gt 0 ]; then
-                echo "Service ${svc} has restart count=${restart_count}";
-                ALL_OK=false; continue
-              fi
-
-              status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "${cid}" 2>/dev/null || echo "unknown")
-              if [ "${status}" = "healthy" ] || [ "${status}" = "running" ]; then
-                echo "Service ${svc} status=${status}";
-              else
-                echo "Service ${svc} not ready: ${status}";
-                ALL_OK=false
-              fi
-            done
-
-            if [ "${ALL_OK}" = true ]; then
+            out=$(docker compose -f docker-compose.yml ps)
+            echo "$out"
+            healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
+            if [ "${healthy_count}" -eq "${N}" ]; then
               echo "All services healthy"
               docker compose -f docker-compose.yml ps
               exit 0
@@ -99,7 +82,7 @@ jobs:
             sleep ${INTERVAL}
           done
 
-          echo "Timeout waiting for healthy services" >&2
+          echo "Timeout waiting for services to become healthy" >&2
           docker compose -f docker-compose.yml ps
           docker compose -f docker-compose.yml logs --tail 200
           exit 1
