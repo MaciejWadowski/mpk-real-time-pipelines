@@ -27,8 +27,8 @@ services:
       dockerfile: dockerfiles/Dockerfile
       args:
         AIRFLOW_UID: ${LOCAL_UID:-1000}
-        AIRFLOW_GID: ${LOCAL_GID:-1000}
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+        AIRFLOW_GID: ${LOCAL_GID:-0}
+    user: "${LOCAL_UID:-1000}:0"
     container_name: airflow_webserver
     restart: always
     depends_on:
@@ -65,8 +65,8 @@ services:
       dockerfile: ./dockerfiles/Dockerfile
       args:
         AIRFLOW_UID: ${LOCAL_UID:-1000}
-        AIRFLOW_GID: ${LOCAL_GID:-1000}
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+        AIRFLOW_GID: ${LOCAL_GID:-0}
+    user: "${LOCAL_UID:-1000}:0"
     container_name: airflow_scheduler
     restart: always
     depends_on:
@@ -90,8 +90,8 @@ services:
       dockerfile: dockerfiles/Dockerfile-worker
       args:
         AIRFLOW_UID: ${LOCAL_UID:-1000}
-        AIRFLOW_GID: ${LOCAL_GID:-1000}
-    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+        AIRFLOW_GID: ${LOCAL_GID:-0}
+    user: "${LOCAL_UID:-1000}:0"
     container_name: airflow_worker
     restart: always
     depends_on:
