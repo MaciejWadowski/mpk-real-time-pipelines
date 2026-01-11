@@ -53,9 +53,9 @@ jobs:
       - name: Health / status
         run: |
           set -euo pipefail
-          # Timeout and interval can be overridden via env vars
-          TIMEOUT=${{ env.HEALTH_TIMEOUT:-300 }}
-          INTERVAL=${{ env.HEALTH_INTERVAL:-5 }}
+          # Timeout and interval can be overridden via env vars (use shell defaults to avoid invalid GH expr)
+          TIMEOUT=${HEALTH_TIMEOUT:-300}
+          INTERVAL=${HEALTH_INTERVAL:-5}
           END=$((SECONDS+TIMEOUT))
 
           services=( $(docker compose -f docker-compose.yml ps --services) )
