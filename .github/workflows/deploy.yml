@@ -21,8 +21,7 @@ jobs:
       DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
       DBT_ROLE: ${{ secrets.DBT_ROLE }}
       AIRFLOW_UID: 1000
-      # Pass through to docker compose so image runs with UID from the runner and GID 0 (required by Airflow image)
-      LOCAL_UID: ${{ env.AIRFLOW_UID }}
+      LOCAL_UID: 1000
       LOCAL_GID: 0
     steps:
       - uses: actions/checkout@v4
