@@ -39,12 +39,25 @@ jobs:
             envsubst < dbt/test-profiles.yml > dbt/profiles.yml
           fi
 
-      - name: Pull images (best-effort)
+      - name: Init airflow
         run: |
-          set -euo pipefail
-          echo "Rebuilding Airflow images (no cache) to pick up env/build-arg changes..."
-          docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
-          docker compose -f docker-compose.yml up -d --remove-orphans
+          docker compose up airflow-webserver -d
+          docker compose run airflow-webserver airflow db init
+          docker compose run airflow-webserver airflow users create \
+            --username admin \
+            --password admin \
+            --firstname Admin \
+            --lastname User \
+            --role Admin \
+            --email admin@example.com
+          docker compose up -d
+
+      # - name: Pull images (best-effort)
+      #   run: |
+      #     set -euo pipefail
+      #     echo "Rebuilding Airflow images (no cache) to pick up env/build-arg changes..."
+      #     docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
+      #     docker compose -f docker-compose.yml up -d --remove-orphans
 
       - name: Ensure repo-local Airflow dirs
         run: |
