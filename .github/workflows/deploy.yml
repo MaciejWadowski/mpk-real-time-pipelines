@@ -40,7 +40,11 @@ jobs:
           fi
 
       - name: Pull images (best-effort)
-        run: docker compose -f docker-compose.yml pull || true
+        run: |
+          set -euo pipefail
+          echo "Rebuilding Airflow images (no cache) to pick up env/build-arg changes..."
+          docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
+          docker compose -f docker-compose.yml up -d --remove-orphans
 
       - name: Ensure repo-local Airflow dirs
         run: |
@@ -50,4 +54,30 @@ jobs:
         run: docker compose -f docker-compose.yml up -d --build --remove-orphans
 
       - name: Health / status
-        run: docker compose -f docker-compose.yml ps
+        run: |
+          set -euo pipefail
+          TIMEOUT=300
+          INTERVAL=10
+          END=$((SECONDS+TIMEOUT))
+
+          if [ ${#services[@]} -eq 0 ]; then
+            echo "No services found in compose file" >&2
+            docker compose -f docker-compose.yml ps
+            exit 1
+          fi
+
+          N=${#services[@]}
+          echo "Waiting up to ${TIMEOUT}s for ${N} services to report '(healthy)' (interval ${INTERVAL}s)..."
+          while [ $SECONDS -lt $END ]; do 
+            echo "$out"
+            healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
+            if [ "${healthy_count}" -eq "${N}" ]; then
+              echo "All services healthy"
+              docker compose -f docker-compose.yml ps
+              exit 0
+            fi
+            sleep ${INTERVAL}
+          done
+          docker compose -f docker-compose.yml ps
+          docker compose -f docker-compose.yml logs --tail 200
+          exit 1
