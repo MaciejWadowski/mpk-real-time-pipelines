@@ -47,11 +47,7 @@ jobs:
           mkdir -p ./logs ./dags ./plugins
 
       - name: Deploy (build & run)
-        run: |
-          set -euo pipefail
-          echo "Rebuilding Airflow images (no cache) to pick up env/build-arg changes..."
-          docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
-          docker compose -f docker-compose.yml up -d --remove-orphans
+        run: docker compose -f docker-compose.yml up -d --build --remove-orphans
 
       - name: Health / status
         run: |
