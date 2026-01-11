@@ -101,6 +101,5 @@ services:
       - ./dbt/profiles.yml:/opt/dbt/config/profiles.yml
     command: celery worker
 volumes:
-
   postgres_data:
     driver: local
