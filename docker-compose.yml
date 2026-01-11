@@ -25,6 +25,10 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile
+      args:
+        AIRFLOW_UID: ${LOCAL_UID:-1000}
+        AIRFLOW_GID: ${LOCAL_GID:-1000}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     container_name: airflow_webserver
     restart: always
     depends_on:
@@ -59,6 +63,10 @@ services:
     build:
       context: .
       dockerfile: ./dockerfiles/Dockerfile
+      args:
+        AIRFLOW_UID: ${LOCAL_UID:-1000}
+        AIRFLOW_GID: ${LOCAL_GID:-1000}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     container_name: airflow_scheduler
     restart: always
     depends_on:
@@ -69,7 +77,7 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - AIRFLOW_UID=1000
+      - AIRFLOW_UID=${LOCAL_UID:-1000}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -80,6 +88,10 @@ services:
     build:
       context: .
       dockerfile: dockerfiles/Dockerfile-worker
+      args:
+        AIRFLOW_UID: ${LOCAL_UID:-1000}
+        AIRFLOW_GID: ${LOCAL_GID:-1000}
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     container_name: airflow_worker
     restart: always
     depends_on:
@@ -92,7 +104,7 @@ services:
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - DBT_PROFILES_DIR=/opt/dbt/config
-      - AIRFLOW_UID=1000
+      - AIRFLOW_UID=${LOCAL_UID:-1000}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
