@@ -20,6 +20,9 @@ jobs:
       DBT_WAREHOUSE: ${{ secrets.DBT_WAREHOUSE }}
       DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
       DBT_ROLE: ${{ secrets.DBT_ROLE }}
+      AIRFLOW_UID: 1000
+      LOCAL_UID: 1000
+      LOCAL_GID: 0
     steps:
       - uses: actions/checkout@v4
         with:
