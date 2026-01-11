@@ -20,9 +20,6 @@ jobs:
       DBT_WAREHOUSE: ${{ secrets.DBT_WAREHOUSE }}
       DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
       DBT_ROLE: ${{ secrets.DBT_ROLE }}
-      AIRFLOW_UID: 1000
-      LOCAL_UID: 1000
-      LOCAL_GID: 0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,35 +50,4 @@ jobs:
         run: docker compose -f docker-compose.yml up -d --build --remove-orphans
 
       - name: Health / status
-        run: |
-          set -euo pipefail
-          TIMEOUT=300
-          INTERVAL=10
-          END=$((SECONDS+TIMEOUT))
-
-          services=( $(docker compose -f docker-compose.yml ps --services) )
-          if [ ${#services[@]} -eq 0 ]; then
-            echo "No services found in compose file" >&2
-            docker compose -f docker-compose.yml ps
-            exit 1
-          fi
-
-          N=${#services[@]}
-          echo "Waiting up to ${TIMEOUT}s for ${N} services to report '(healthy)' (interval ${INTERVAL}s)..."
-
-          while [ $SECONDS -lt $END ]; do
-            out=$(docker compose -f docker-compose.yml ps)
-            echo "$out"
-            healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
-            if [ "${healthy_count}" -eq "${N}" ]; then
-              echo "All services healthy"
-              docker compose -f docker-compose.yml ps
-              exit 0
-            fi
-            sleep ${INTERVAL}
-          done
-
-          echo "Timeout waiting for services to become healthy" >&2
-          docker compose -f docker-compose.yml ps
-          docker compose -f docker-compose.yml logs --tail 200
-          exit 1
+        run: docker compose -f docker-compose.yml ps
