@@ -15,7 +15,7 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    AIRFLOW_CONN_MY_SNOWFLAKE_CONN: snowflake://${DBT_USER}:${DBT_PASSWORD}@${DBT_ACCOUNT}/${DBT_DATABASE}/${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}
+    AIRFLOW_CONN_MY_SNOWFLAKE_CONN: snowflake://${DBT_USER}:${DBT_PASSWORD}@/${DBT_DATABASE}/account=${DBT_ACCOUNT}&${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
