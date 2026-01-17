@@ -100,7 +100,7 @@ services:
   airflow-worker:
     build:
       context: .
-      dockerfile: dockerfiles/Dockerfile
+      dockerfile: dockerfiles/Dockerfile-worker
     command: celery worker
     user: "${AIRFLOW_UID:-50000}:0"
     healthcheck:
