@@ -17,7 +17,7 @@ x-airflow-common:
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW_CONN_MY_SNOWFLAKE_CONN: snowflake://${DBT_USER}:${DBT_PASSWORD}@/${DBT_DATABASE}/${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}&account=${DBT_ACCOUNT}&database=${DBT_DATABASE}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    AIRFLOW_VAR_TOMTOM_API_KEY_VAR: ${TOMTOM_API_KEY}
+    AIRFLOW_VAR_TOM_TOM_API_KEYS: ${TOMTOM_API_KEY}
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
