@@ -39,8 +39,8 @@ services:
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS=False
-      - AIRFLOW_UID=1000
       - AIRFLOW_CONN_MY_SNOWFLAKE_CONN=snowflake://${DBT_USER}:${DBT_PASSWORD}@${DBT_ACCOUNT}/${DBT_DATABASE}/${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}
+      - HOME=/opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -69,7 +69,7 @@ services:
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
-      - AIRFLOW_UID=${LOCAL_UID:-1000}
+      - HOME=/opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -92,7 +92,7 @@ services:
       - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
       - AIRFLOW__CELERY__BROKER_URL=redis://redis:6379/0
       - DBT_PROFILES_DIR=/opt/dbt/config
-      - AIRFLOW_UID=${LOCAL_UID:-1000}
+      - HOME=/opt/airflow
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs

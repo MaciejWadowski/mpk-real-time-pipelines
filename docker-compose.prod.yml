@@ -1,0 +1,15 @@
+version: '3.8'
+# Production override - removes dags, plugins, logs mounts (uses copies from image instead)
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  airflow-webserver:
+    volumes: []  # Override to remove all mounts from base, logs will be internal
+
+  airflow-scheduler:
+    volumes: []  # Override to remove all mounts from base
+
+  airflow-worker:
+    volumes:
+      - ./dbt:/opt/airflow/dbt  # Keep dbt mount for profiles
+      - ./dbt/profiles.yml:/opt/dbt/config/profiles.yml
