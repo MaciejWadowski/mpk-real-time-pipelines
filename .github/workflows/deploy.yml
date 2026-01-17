@@ -58,7 +58,7 @@ jobs:
           DBT_ROLE=${{ secrets.DBT_ROLE }}
           EOF
 
-      - name: Stop services if running 
+      - name: Stop services if running
         run: docker compose stop
 
       - name: Init airflow
@@ -76,7 +76,7 @@ jobs:
 
           if [ ${#services[@]} -eq 0 ]; then
             echo "No services found in compose file" >&2
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+            docker compose ps
             exit 1
           fi
 
@@ -87,11 +87,11 @@ jobs:
             healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
             if [ "${healthy_count}" -eq "${N}" ]; then
               echo "All services healthy"
-              docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+              docker compose ps
               exit 0
             fi
             sleep ${INTERVAL}
           done
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 200
+          docker compose ps
+          docker compose logs --tail 200
           exit 1
