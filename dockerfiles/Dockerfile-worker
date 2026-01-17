@@ -1,3 +1,4 @@
 FROM apache/airflow:2.10.5
 
-RUN pip install --no-cache-dir protobuf==6.33.0 &&  pip install --no-cache-dir  dbt-snowflake==1.9.4 gtfs_kit==12.0.0 gtfs-realtime-bindings==1.0.0
+COPY constraints.txt constraints.txt
+RUN pip install --no-cache-dir  dbt-snowflake==1.9.4 gtfs_kit==12.0.0 gtfs-realtime-bindings==1.0.0 --constraint constraints.txt
