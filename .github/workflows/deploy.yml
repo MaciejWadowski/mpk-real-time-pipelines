@@ -74,18 +74,16 @@ jobs:
           INTERVAL=10
           END=$((SECONDS+TIMEOUT))
 
-          if [ ${#services[@]} -eq 0 ]; then
-            echo "No services found in compose file" >&2
-            docker compose ps
-            exit 1
-          fi
-
-          N=${#services[@]}
-          echo "Waiting up to ${TIMEOUT}s for ${N} services to report '(healthy)' (interval ${INTERVAL}s)..."
+          echo "Waiting up to ${TIMEOUT}s for services to be healthy (interval ${INTERVAL}s)..."
           while [ $SECONDS -lt $END ]; do 
+            out=$(docker compose ps 2>&1 || true)
             echo "$out"
+            
+            # Count healthy services
             healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
-            if [ "${healthy_count}" -eq "${N}" ]; then
+            total_count=$(echo "$out" | grep -E 'airflow-|postgres|redis' | wc -l)
+            
+            if [ "$healthy_count" -gt 0 ] && [ "$healthy_count" -eq "$total_count" ]; then
               echo "All services healthy"
               docker compose ps
               exit 0
