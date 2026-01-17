@@ -96,13 +96,19 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+    volumes:
+      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
+      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
+      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
+      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+      - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
+      - ${AIRFLOW_PROJ_DIR:-.}/dbt/profiles.yml:/opt/dbt/config/profiles.yml
+      - /var/run/docker.sock:/var/run/docker.sock:rw
 
   airflow-worker:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile-worker
+    <<: *airflow-common
     command: celery worker
-    user: "${AIRFLOW_UID:-50000}:0"
+    hostname: airflow-worker
     healthcheck:
       test:
         - "CMD-SHELL"
@@ -115,13 +121,6 @@ services:
       <<: *airflow-common-env
       DUMB_INIT_SETSID: "0"
     restart: always
-    volumes:
-      - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
-      - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
-      - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
-      - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-      - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
-      - ${AIRFLOW_PROJ_DIR:-.}/dbt/profiles.yml:/opt/dbt/config/profiles.yml
     depends_on:
       <<: *airflow-common-depends-on
       airflow-init:
@@ -240,6 +239,15 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
+  dbt:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile
+    volumes:
+      - ./dbt:/dbt
+      - ./dbt/profiles.yml:/root/.dbt/profiles.yml
+
 volumes:
   postgres_data:
     driver: local

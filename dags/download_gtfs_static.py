@@ -7,6 +7,8 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.snowflake.hooks.snowflake import SnowflakeHook
 from snowflake.connector.pandas_tools import write_pandas
 from airflow.operators.bash_operator import BashOperator
+from airflow.operators.python import PythonVirtualenvOperator
+
 
 
 default_args = {
@@ -190,10 +192,32 @@ with DAG(
         python_callable=ingest_static_data_to_snowflake,
     )
 
-    bash_dbt_operator = BashOperator (   
-                                    task_id='run_dbt', 
-                                    bash_command="cd /opt/airflow/dbt/gtfs_project && dbt run --vars '{\"execution_date\": \"{{ds}}\"}'",
-                                    dag=dag
-                                 )
+    def run_dbt():
+        from dbt.cli.main import dbtRunner, dbtRunnerResult
+
+        runner = dbtRunner()
+
+        result: dbtRunnerResult = runner.invoke([
+            "run",
+            "--project-dir", "/opt/airflow/dbt/gtfs_project",
+            "--profiles-dir", "/opt/airflow/dbt",
+            "--vars", '{"execution_date": "2026-01-17"}',
+        ])
+
+        if not result.success:
+            raise RuntimeError("dbt run failed")
+
+    bash_dbt_operator = PythonVirtualenvOperator(
+        task_id="run_dbt",
+        python_callable=run_dbt,
+        requirements=[
+            "dbt-snowflake==1.9.4"
+        ],
+        system_site_packages=False,
+        op_kwargs={
+            "execution_date": "{{ ds }}"
+        },
+        dag=dag,
+    )
 
     download_gtfs_task >> bash_dbt_operator
