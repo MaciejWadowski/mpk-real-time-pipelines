@@ -59,10 +59,6 @@ jobs:
       #     docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
       #     docker compose -f docker-compose.yml up -d --remove-orphans
 
-      - name: Ensure repo-local Airflow dirs
-        run: |
-          mkdir -p ./logs ./dags ./plugins
-
       - name: Deploy (build & run)
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
 
