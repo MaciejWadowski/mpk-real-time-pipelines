@@ -20,6 +20,7 @@ jobs:
       DBT_WAREHOUSE: ${{ secrets.DBT_WAREHOUSE }}
       DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
       DBT_ROLE: ${{ secrets.DBT_ROLE }}
+      TOM_TOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,6 +57,7 @@ jobs:
           DBT_WAREHOUSE=${{ secrets.DBT_WAREHOUSE }}
           DBT_DATABASE=${{ secrets.DBT_DATABASE }}
           DBT_ROLE=${{ secrets.DBT_ROLE }}
+          TOMTOM_API_KEY=${{ secrets.TOMTOM_API_KEY }}
           EOF
 
       - name: Stop services if running
