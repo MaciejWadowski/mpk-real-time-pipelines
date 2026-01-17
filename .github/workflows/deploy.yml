@@ -38,29 +38,17 @@ jobs:
           else
             envsubst < dbt/test-profiles.yml > dbt/profiles.yml
           fi
+      
+      - name: Setting airflow user
+        run: |
+          mkdir -p ./dags ./logs ./plugins ./config
+          echo -e "AIRFLOW_UID=$(id -u)" > .env
 
       - name: Init airflow
-        run: |
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up airflow-webserver -d
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml run airflow-webserver airflow db init
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml run airflow-webserver airflow users create \
-            --username admin \
-            --password admin \
-            --firstname Admin \
-            --lastname User \
-            --role Admin \
-            --email admin@example.com
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-      # - name: Pull images (best-effort)
-      #   run: |
-      #     set -euo pipefail
-      #     echo "Rebuilding Airflow images (no cache) to pick up env/build-arg changes..."
-      #     docker compose -f docker-compose.yml build --pull --no-cache airflow-webserver airflow-scheduler airflow-worker
-      #     docker compose -f docker-compose.yml up -d --remove-orphans
+        run: docker compose up airflow-init
 
       - name: Deploy (build & run)
-        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --remove-orphans
+        run: docker compose up -d --build --remove-orphans
 
       - name: Health / status
         run: |
