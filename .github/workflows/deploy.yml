@@ -39,10 +39,27 @@ jobs:
             envsubst < dbt/test-profiles.yml > dbt/profiles.yml
           fi
       
-      - name: Setting airflow user
+      - name: Create .env file with all variables
         run: |
           mkdir -p ./dags ./logs ./plugins ./config
-          echo -e "AIRFLOW_UID=$(id -u)" > .env
+        
+          cat > .env <<EOF
+          AIRFLOW_UID=$(id -u)
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          AIRFLOW_FERNET_KEY=${{ secrets.AIRFLOW_FERNET_KEY }}
+          DBT_USER=${{ secrets.DBT_USER }}
+          DBT_PASSWORD=${{ secrets.DBT_PASSWORD }}
+          DBT_SCHEMA=${{ secrets.DBT_SCHEMA }}
+          DBT_ACCOUNT=${{ secrets.DBT_ACCOUNT }}
+          DBT_WAREHOUSE=${{ secrets.DBT_WAREHOUSE }}
+          DBT_DATABASE=${{ secrets.DBT_DATABASE }}
+          DBT_ROLE=${{ secrets.DBT_ROLE }}
+          EOF
+
+      - name: Stop services if running 
+        run: docker compose stop
 
       - name: Init airflow
         run: docker compose up airflow-init
