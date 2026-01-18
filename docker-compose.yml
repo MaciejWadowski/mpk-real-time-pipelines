@@ -103,7 +103,6 @@ services:
       - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
       - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
       - ${AIRFLOW_PROJ_DIR:-.}/dbt/profiles.yml:/opt/dbt/config/profiles.yml
-      - /var/run/docker.sock:/var/run/docker.sock:rw
 
   airflow-worker:
     <<: *airflow-common
