@@ -192,7 +192,7 @@ with DAG(
         python_callable=ingest_static_data_to_snowflake,
     )
 
-    def run_dbt():
+    def run_dbt(**context):
         from dbt.cli.main import dbtRunner, dbtRunnerResult
 
         runner = dbtRunner()
@@ -201,7 +201,7 @@ with DAG(
             "run",
             "--project-dir", "/opt/airflow/dbt/gtfs_project",
             "--profiles-dir", "/opt/airflow/dbt",
-            "--vars", '{"execution_date": "2026-01-17"}',
+            "--vars", f'{{"execution_date": "{context["execution_date"]}"}}',
         ])
 
         if not result.success:
