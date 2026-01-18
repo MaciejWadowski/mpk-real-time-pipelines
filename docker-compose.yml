@@ -239,15 +239,6 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
-
-  dbt:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile
-    volumes:
-      - ./dbt:/dbt
-      - ./dbt/profiles.yml:/root/.dbt/profiles.yml
-
 volumes:
   postgres_data:
     driver: local
