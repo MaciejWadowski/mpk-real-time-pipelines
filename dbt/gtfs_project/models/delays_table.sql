@@ -1,4 +1,4 @@
-{{ config(materialized='table', alias='DELAYS_TABLE')}}
+{{ config(materialized='table', alias='DELAYS_TABLE_VECTORS')}}
 
 WITH RAW_UPDATES AS (
     SELECT 
