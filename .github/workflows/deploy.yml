@@ -1,0 +1,95 @@
+name: Deploy to self-hosted host
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    env:
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      AIRFLOW_FERNET_KEY: ${{ secrets.AIRFLOW_FERNET_KEY }}
+      DBT_USER: ${{ secrets.DBT_USER }}
+      DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
+      DBT_SCHEMA: ${{ secrets.DBT_SCHEMA }}
+      DBT_ACCOUNT: ${{ secrets.DBT_ACCOUNT }}
+      DBT_WAREHOUSE: ${{ secrets.DBT_WAREHOUSE }}
+      DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
+      DBT_ROLE: ${{ secrets.DBT_ROLE }}
+      TOM_TOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Generate dbt profiles.yml in repo/dbt
+        run: |
+          mkdir -p dbt
+          if ! command -v envsubst >/dev/null 2>&1; then
+            python - <<'PY'
+          import os
+          from string import Template
+          t = Template(open('dbt/test-profiles.yml').read())
+          open('dbt/profiles.yml','w').write(t.safe_substitute(os.environ))
+          PY
+          else
+            envsubst < dbt/test-profiles.yml > dbt/profiles.yml
+          fi
+      
+      - name: Create .env file with all variables
+        run: |
+          mkdir -p ./dags ./logs ./plugins ./config
+        
+          cat > .env <<EOF
+          AIRFLOW_UID=$(id -u)
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          AIRFLOW_FERNET_KEY=${{ secrets.AIRFLOW_FERNET_KEY }}
+          DBT_USER=${{ secrets.DBT_USER }}
+          DBT_PASSWORD=${{ secrets.DBT_PASSWORD }}
+          DBT_SCHEMA=${{ secrets.DBT_SCHEMA }}
+          DBT_ACCOUNT=${{ secrets.DBT_ACCOUNT }}
+          DBT_WAREHOUSE=${{ secrets.DBT_WAREHOUSE }}
+          DBT_DATABASE=${{ secrets.DBT_DATABASE }}
+          DBT_ROLE=${{ secrets.DBT_ROLE }}
+          TOMTOM_API_KEY=${{ secrets.TOMTOM_API_KEY }}
+          EOF
+
+      - name: Stop services if running
+        run: docker compose stop
+
+      - name: Init airflow
+        run: docker compose up airflow-init
+
+      - name: Deploy (build & run)
+        run: docker compose up -d --build --remove-orphans
+
+      - name: Health / status
+        run: |
+          set -euo pipefail
+          TIMEOUT=300
+          INTERVAL=10
+          END=$((SECONDS+TIMEOUT))
+
+          echo "Waiting up to ${TIMEOUT}s for services to be healthy (interval ${INTERVAL}s)..."
+          while [ $SECONDS -lt $END ]; do 
+            out=$(docker compose ps 2>&1 || true)
+            echo "$out"
+            
+            # Count healthy services
+            healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
+            total_count=$(echo "$out" | grep -E 'airflow-|postgres|redis' | wc -l)
+            
+            if [ "$healthy_count" -gt 0 ] && [ "$healthy_count" -eq "$total_count" ]; then
+              echo "All services healthy"
+              docker compose ps
+              exit 0
+            fi
+            sleep ${INTERVAL}
+          done
+          docker compose ps
+          docker compose logs --tail 200
+          exit 1
