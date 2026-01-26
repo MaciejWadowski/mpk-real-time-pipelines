@@ -16,6 +16,7 @@ sources:
     schema: trip_updates
     tables:
       - name: trip_updates
+      - name: vehicle_positions
   - name: weather_api_staging
     database: gtfs_test
     schema: weather_api_staging
