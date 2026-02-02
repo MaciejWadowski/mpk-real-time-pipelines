@@ -16,6 +16,7 @@ INNER JOIN {{ ref('delays_table_vectors') }} dt
     ON vp.TRIP_ID = dt.trip_id 
     AND TO_CHAR(vp.LOAD_TIMESTAMP, 'YYYYMMDD') = dt.event_date
     AND vp.CURRENT_STOP_SEQUENCE = dt.end_stop_sequence
+    AND vp.MODE = dt.MODE
 WHERE 
     vp.CURRENT_STATUS IN (1, 2)
 QUALIFY ROW_NUMBER() OVER (
