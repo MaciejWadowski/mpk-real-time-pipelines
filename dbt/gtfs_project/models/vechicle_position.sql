@@ -12,7 +12,7 @@ SELECT
     vp.TRIP_ID,
     dt.vector_unique_id
 FROM {{ source('trip_updates', 'vehicle_positions') }} vp
-INNER JOIN {{ ref('delays_table') }} dt
+INNER JOIN {{ ref('delays_table_vectors') }} dt
     ON vp.TRIP_ID = dt.trip_id 
     AND TO_CHAR(vp.LOAD_TIMESTAMP, 'YYYYMMDD') = dt.event_date
     AND vp.CURRENT_STOP_SEQUENCE = dt.end_stop_sequence
