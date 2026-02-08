@@ -9,5 +9,5 @@ gtfs_project:
       threads: 1
       type: snowflake
       user: "${DBT_USER}"
-      warehouse: "${DBT_WAREHOUSE}"
+      warehouse: "${DBT_WAREHOUSE_STRONK}"
   target: dev
