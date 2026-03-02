@@ -1,17 +1,59 @@
 WITH
-    latest_trip_update AS (
-        -- keep the row with the largest delay per (trip_id, stop_sequence, mode) - case when trip prolongs longer than 1 minute
+    change_indicators AS (
         SELECT
             trip_id,
             stop_sequence,
             stop_id,
             mode,
             delay,
-            load_timestamp
+            load_timestamp,
+            CASE
+                WHEN stop_sequence > LEAD(stop_sequence) OVER (
+                    PARTITION BY
+                        trip_id,
+                        mode
+                    ORDER BY
+                        load_timestamp
+                ) THEN 1
+                ELSE 0
+            END AS change_indicator
         FROM
-            GTFS_TEST.SCHEDULE_DATA_MARTS.DELAYS_TABLE QUALIFY ROW_NUMBER() OVER (
+            GTFS_TEST.SCHEDULE_DATA_MARTS.DELAYS_TABLE
+    ),
+    sessionize AS (
+        SELECT
+            trip_id,
+            stop_sequence,
+            stop_id,
+            mode,
+            delay,
+            load_timestamp,
+            SUM(change_indicator) OVER (
                 PARTITION BY
                     trip_id,
+                    mode
+                ORDER BY
+                    load_timestamp
+            ) AS session_id
+        FROM
+            change_indicators
+    ),
+
+    latest_trip_update AS (
+        -- keep the row with the largest delay per (trip_id, stop_sequence, mode) - case when trip prolongs longer than 1 minute
+        SELECT
+            trip_id,
+            session_id,
+            stop_sequence,
+            stop_id,
+            mode,
+            delay,
+            load_timestamp
+        FROM
+            sessionize QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY
+                    trip_id,
+                    session_id,
                     stop_sequence,
                     mode
                 ORDER BY
@@ -31,6 +73,7 @@ WITH
             LEAD(stop_id) OVER (
                 PARTITION BY
                     trip_id,
+                    session_id,
                     mode
                 ORDER BY
                     stop_sequence
@@ -38,6 +81,7 @@ WITH
             LEAD(stop_sequence) OVER (
                 PARTITION BY
                     trip_id,
+                    session_id,
                     mode
                 ORDER BY
                     stop_sequence
@@ -101,7 +145,7 @@ SELECT
 FROM
     avg_delays_geolocation
 WHERE
-    delay_date = '2026-02-25'
+    delay_date between '2026-02-24' and '2026-02-28'
 ORDER BY
     stop_id DESC,
     delay_hour;
