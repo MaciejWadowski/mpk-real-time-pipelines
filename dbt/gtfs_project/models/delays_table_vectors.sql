@@ -65,4 +65,4 @@ SELECT
     MD5(trip_id || schedule_event_date || stop_sequence || COALESCE(LEAD(stop_sequence) OVER (PARTITION BY trip_id, mode, schedule_event_date ORDER BY stop_sequence)::STRING, 'END')) AS vector_unique_id
 FROM COMBINED_STOPS
 WHERE actual_time IS NOT NULL
-QUALIFY direction_stop_id IS NOT NULL;
+QUALIFY direction_stop_id IS NOT NULL
