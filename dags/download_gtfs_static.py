@@ -72,6 +72,8 @@ with DAG(
                 feed.calendar["mode"] = mode_letter
             if hasattr(feed, "calendar_dates"):
                 feed.calendar_dates["mode"] = mode_letter
+            if hasattr(feed, "shapes"):
+                feed.shapes["mode"] = mode_letter
 
             feeds.append(feed)
 
@@ -95,6 +97,13 @@ with DAG(
                 else:
                     merged_feed.calendar_dates = feed.calendar_dates.copy().drop_duplicates()
 
+            if hasattr(feed, "shapes"):
+                if hasattr(merged_feed, "shapes"):
+                    merged_feed.shapes = pd.concat([merged_feed.shapes, feed.shapes],
+                                                   ignore_index=True).drop_duplicates()
+                else:
+                    merged_feed.shapes = feed.shapes.copy().drop_duplicates()
+
         # Add a load timestamp to each table
         merged_feed.routes['load_timestamp'] = logical_date
         merged_feed.trips['load_timestamp'] = logical_date
@@ -106,6 +115,9 @@ with DAG(
         
         if hasattr(merged_feed, "calendar_dates"):
             merged_feed.calendar_dates['load_timestamp'] = logical_date
+
+        if hasattr(merged_feed, "shapes"):
+            merged_feed.shapes['load_timestamp'] = logical_date
 
         return merged_feed
 
@@ -150,6 +162,8 @@ with DAG(
             tables.append("calendar")
         if hasattr(merged_feed, "calendar_dates"):
             tables.append("calendar_dates")
+        if hasattr(merged_feed, "shapes"):
+            tables.append("shapes")
             
         for table in tables:
             df = getattr(merged_feed, table).reset_index(drop=True)
