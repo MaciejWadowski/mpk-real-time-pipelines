@@ -8,7 +8,7 @@ WITH
             delay,
             load_timestamp,
             CASE
-                WHEN stop_sequence > LEAD(stop_sequence) OVER (
+                WHEN stop_sequence < LAG(stop_sequence) OVER (
                     PARTITION BY
                         trip_id,
                         mode
