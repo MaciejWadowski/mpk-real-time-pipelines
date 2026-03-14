@@ -206,10 +206,10 @@ with DAG(
     
     # Konfiguracja - zauważ, że nie musisz już ręcznie dodawać LOAD_TIMESTAMP do wykluczeń!
     table_config = {
-        "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": True},
-        "TRIPS": {"pks": ["TRIP_ID"], "use_scd2": True},
-        "STOPS": {"pks": ["STOP_ID"], "use_scd2": True},
-        "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": True},
+        "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": False},
+        "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": True},
+        "STOPS": {"pks": ["STOP_ID"], "use_scd2": False},
+        "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": False},
         "CALENDAR_DATES": {"pks": ["SERVICE_ID", "DATE"], "use_scd2": False},
         "STOP_TIMES": {"pks": ["TRIP_ID", "STOP_SEQUENCE"], "use_scd2": False},
         "SHAPES": {"pks": ["SHAPE_ID", "SHAPE_PT_SEQUENCE"], "use_scd2": False}
