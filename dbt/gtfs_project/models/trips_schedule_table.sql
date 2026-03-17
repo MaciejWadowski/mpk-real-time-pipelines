@@ -1,4 +1,4 @@
-{{ config(materialized='table', alias='TRIPS_SCHEDULE_TABLE')}}
+{{ config(materialized='table', alias='TRIPS_SCHEDULE_TABLE_NEW')}}
 
 WITH calendar AS (
   SELECT
