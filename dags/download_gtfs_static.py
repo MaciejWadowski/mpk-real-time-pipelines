@@ -263,7 +263,7 @@ with DAG(
             join_conditions = " AND ".join([f"tgt.{pk} = stg.{pk}" for pk in pks])
 
             update_sql = f"""
-                UPDATE {table} tgt
+                UPDATE {table}_scd2 tgt
                 SET tgt.VALID_TO = stg.{logical_date_col},
                     tgt.IS_ACTIVE = FALSE
                 FROM {stg_table} stg
@@ -274,11 +274,11 @@ with DAG(
             cs.execute(update_sql)
             
             insert_sql = f"""
-                INSERT INTO {table} ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
+                INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
                 SELECT {cols_str}, stg.{logical_date_col}, NULL, TRUE
                 FROM {stg_table} stg
                 WHERE NOT EXISTS (
-                    SELECT 1 FROM {table} tgt 
+                    SELECT 1 FROM {table}_scd2 tgt 
                     WHERE {join_conditions} AND tgt.IS_ACTIVE = TRUE
                 )
             """
