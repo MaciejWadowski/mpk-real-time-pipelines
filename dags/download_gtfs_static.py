@@ -196,103 +196,103 @@ with DAG(
 
 
     def load_data_from_staging(**kwargs):
-    """
-    Loads data from STAGING to Target tables based on configuration.
-    Applies SCD2 logic. The logical date column is automatically excluded from change tracking.
-    """
-    hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
-    conn = hook.get_conn()
-    cs = conn.cursor()
-
-    table_config = {
-        "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": True},
-        "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": False},
-        "STOPS": {"pks": ["STOP_ID"], "use_scd2": False},
-        "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": False},
-        "CALENDAR_DATES": {"pks": ["SERVICE_ID", "DATE"], "use_scd2": False},
-        "STOP_TIMES": {"pks": ["TRIP_ID", "STOP_SEQUENCE"], "use_scd2": False},
-        "SHAPES": {"pks": ["SHAPE_ID", "SHAPE_PT_SEQUENCE"], "use_scd2": False}
-    }
-
-    cs.execute("USE SCHEMA SCHEDULE")
-
-    for table, config in table_config.items():
-        pks = [pk.upper() for pk in config["pks"]]
-        use_scd2 = config.get("use_scd2", False)
-        
-        logical_date_col = config.get("logical_date_col", "LOAD_TIMESTAMP").upper()
-        
-        exclude_cols = [col.upper() for col in config.get("scd2_exclude_cols", [])]
-        
-        if logical_date_col not in exclude_cols:
-            exclude_cols.append(logical_date_col)
+        """
+        Loads data from STAGING to Target tables based on configuration.
+        Applies SCD2 logic. The logical date column is automatically excluded from change tracking.
+        """
+        hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
+        conn = hook.get_conn()
+        cs = conn.cursor()
+    
+        table_config = {
+            "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": True},
+            "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": False},
+            "STOPS": {"pks": ["STOP_ID"], "use_scd2": False},
+            "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": False},
+            "CALENDAR_DATES": {"pks": ["SERVICE_ID", "DATE"], "use_scd2": False},
+            "STOP_TIMES": {"pks": ["TRIP_ID", "STOP_SEQUENCE"], "use_scd2": False},
+            "SHAPES": {"pks": ["SHAPE_ID", "SHAPE_PT_SEQUENCE"], "use_scd2": False}
+        }
+    
+        cs.execute("USE SCHEMA SCHEDULE")
+    
+        for table, config in table_config.items():
+            pks = [pk.upper() for pk in config["pks"]]
+            use_scd2 = config.get("use_scd2", False)
             
-        stg_table = f"{table}_STG"
-        
-        cs.execute(f"SHOW TABLES LIKE '{stg_table}' IN SCHEMA SCHEDULE")
-        if not cs.fetchone():
-            print(f"Staging table {stg_table} does not exist. Skipping for {table}.")
-            continue
-
-        create_target_ddl = f"CREATE TABLE IF NOT EXISTS {table} CLONE {stg_table};"
-        cs.execute(create_target_ddl)
-
-        cs.execute(f"SELECT * FROM {stg_table} LIMIT 1")
-        columns = [col[0].upper() for col in cs.description]
-        cols_str = ", ".join(columns)
-
-        if use_scd2:
-            print(f"Applying SCD2 logic for {table}...")
-        
-            try:
-                cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_FROM TIMESTAMP_NTZ;")
-                cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_TO TIMESTAMP_NTZ;")
-                cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS IS_ACTIVE BOOLEAN;")
-            except Exception:
-                pass
-
-            cols_to_hash = [c for c in columns if c not in pks and c not in exclude_cols]
+            logical_date_col = config.get("logical_date_col", "LOAD_TIMESTAMP").upper()
             
-            if not cols_to_hash:
-                print(f"Brak kolumn do śledzenia zmian dla {table}. Pomijam SCD2.")
+            exclude_cols = [col.upper() for col in config.get("scd2_exclude_cols", [])]
+            
+            if logical_date_col not in exclude_cols:
+                exclude_cols.append(logical_date_col)
+                
+            stg_table = f"{table}_STG"
+            
+            cs.execute(f"SHOW TABLES LIKE '{stg_table}' IN SCHEMA SCHEDULE")
+            if not cs.fetchone():
+                print(f"Staging table {stg_table} does not exist. Skipping for {table}.")
                 continue
-
-            tgt_hash_expr = "HASH(" + ", ".join([f"tgt.{c}" for c in cols_to_hash]) + ")"
-            stg_hash_expr = "HASH(" + ", ".join([f"stg.{c}" for c in cols_to_hash]) + ")"
-
-            join_conditions = " AND ".join([f"tgt.{pk} = stg.{pk}" for pk in pks])
-
-            update_sql = f"""
-                UPDATE {table}_scd2 tgt
-                SET tgt.VALID_TO = stg.{logical_date_col},
-                    tgt.IS_ACTIVE = FALSE
-                FROM {stg_table} stg
-                WHERE {join_conditions}
-                  AND tgt.IS_ACTIVE = TRUE
-                  AND {tgt_hash_expr} != {stg_hash_expr}
-            """
-            cs.execute(update_sql)
+    
+            create_target_ddl = f"CREATE TABLE IF NOT EXISTS {table} CLONE {stg_table};"
+            cs.execute(create_target_ddl)
+    
+            cs.execute(f"SELECT * FROM {stg_table} LIMIT 1")
+            columns = [col[0].upper() for col in cs.description]
+            cols_str = ", ".join(columns)
+    
+            if use_scd2:
+                print(f"Applying SCD2 logic for {table}...")
             
-            insert_sql = f"""
-                INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
-                SELECT {cols_str}, stg.{logical_date_col}, NULL, TRUE
-                FROM {stg_table} stg
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM {table}_scd2 tgt 
-                    WHERE {join_conditions} AND tgt.IS_ACTIVE = TRUE
-                )
-            """
-            cs.execute(insert_sql)
-            print(f"SCD2 applied for {table}.")
-            
-        else:
-            insert_sql = f"""
-                INSERT INTO {table} ({cols_str})
-                SELECT {cols_str} FROM {stg_table}
-            """
-            cs.execute(insert_sql)
-            print(f"Simple INSERT completed for {table}.")
-
+                try:
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_FROM TIMESTAMP_NTZ;")
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_TO TIMESTAMP_NTZ;")
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS IS_ACTIVE BOOLEAN;")
+                except Exception:
+                    pass
+    
+                cols_to_hash = [c for c in columns if c not in pks and c not in exclude_cols]
+                
+                if not cols_to_hash:
+                    print(f"Brak kolumn do śledzenia zmian dla {table}. Pomijam SCD2.")
+                    continue
+    
+                tgt_hash_expr = "HASH(" + ", ".join([f"tgt.{c}" for c in cols_to_hash]) + ")"
+                stg_hash_expr = "HASH(" + ", ".join([f"stg.{c}" for c in cols_to_hash]) + ")"
+    
+                join_conditions = " AND ".join([f"tgt.{pk} = stg.{pk}" for pk in pks])
+    
+                update_sql = f"""
+                    UPDATE {table}_scd2 tgt
+                    SET tgt.VALID_TO = stg.{logical_date_col},
+                        tgt.IS_ACTIVE = FALSE
+                    FROM {stg_table} stg
+                    WHERE {join_conditions}
+                      AND tgt.IS_ACTIVE = TRUE
+                      AND {tgt_hash_expr} != {stg_hash_expr}
+                """
+                cs.execute(update_sql)
+                
+                insert_sql = f"""
+                    INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
+                    SELECT {cols_str}, stg.{logical_date_col}, NULL, TRUE
+                    FROM {stg_table} stg
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM {table}_scd2 tgt 
+                        WHERE {join_conditions} AND tgt.IS_ACTIVE = TRUE
+                    )
+                """
+                cs.execute(insert_sql)
+                print(f"SCD2 applied for {table}.")
+                
+            else:
+                insert_sql = f"""
+                    INSERT INTO {table} ({cols_str})
+                    SELECT {cols_str} FROM {stg_table}
+                """
+                cs.execute(insert_sql)
+                print(f"Simple INSERT completed for {table}.")
+    
 
     download_gtfs_task = PythonOperator(
         task_id='download_gtfs_data',
