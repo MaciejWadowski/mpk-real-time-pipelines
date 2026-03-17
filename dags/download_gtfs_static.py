@@ -203,8 +203,7 @@ with DAG(
     hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
     conn = hook.get_conn()
     cs = conn.cursor()
-    
-    # Konfiguracja - zauważ, że nie musisz już ręcznie dodawać LOAD_TIMESTAMP do wykluczeń!
+
     table_config = {
         "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": True},
         "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": False},
