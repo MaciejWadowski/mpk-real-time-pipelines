@@ -297,7 +297,6 @@ with DAG(
                 cs.execute(insert_sql)
                 print(f"Simple INSERT completed for {table}.")
     
-            cs.execute(f"TRUNCATE TABLE {stg_table}")
     download_gtfs_task = PythonOperator(
         task_id='download_gtfs_data',
         python_callable=ingest_static_data_to_snowflake,
