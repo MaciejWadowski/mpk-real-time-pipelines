@@ -228,11 +228,6 @@ with DAG(
                 exclude_cols.append(logical_date_col)
                 
             stg_table = f"{table}_STG"
-            
-            cs.execute(f"SHOW TABLES LIKE '{stg_table}' IN SCHEMA SCHEDULE")
-            if not cs.fetchone():
-                print(f"Staging table {stg_table} does not exist. Skipping for {table}.")
-                continue
     
             create_target_ddl = f"CREATE TABLE IF NOT EXISTS {table} CLONE {stg_table};"
             cs.execute(create_target_ddl)
@@ -247,7 +242,7 @@ with DAG(
                 try:
                     cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_FROM TIMESTAMP_NTZ;")
                     cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_TO TIMESTAMP_NTZ;")
-                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS IS_ACTIVE BOOLEAN;")
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS IS_CURRENT BOOLEAN;")
                 except Exception:
                     pass
     
@@ -265,22 +260,22 @@ with DAG(
                 update_sql = f"""
                     UPDATE {table}_scd2 tgt
                     SET tgt.VALID_TO = stg.{logical_date_col},
-                        tgt.IS_ACTIVE = FALSE
+                        tgt.IS_CURRENT = FALSE
                     FROM {stg_table} stg
                     WHERE {join_conditions}
-                      AND tgt.IS_ACTIVE = TRUE
+                      AND tgt.IS_CURRENT = TRUE
                       AND {tgt_hash_expr} != {stg_hash_expr}
                 """
                 cs.execute(update_sql)
                 
                insert_sql = f"""
-                            INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
+                            INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_CURRENT)
                             SELECT {stg_cols_prefixed}, stg.{logical_date_col}, NULL, TRUE
                             FROM {stg_table} stg
                             WHERE NOT EXISTS (
                                 SELECT 1 FROM {table}_scd2 tgt 
                                 WHERE {join_conditions} 
-                                  AND tgt.IS_ACTIVE = TRUE
+                                  AND tgt.IS_CURRENT = TRUE
                                   AND {tgt_hash_expr} = {stg_hash_expr}
                             )
                         """
