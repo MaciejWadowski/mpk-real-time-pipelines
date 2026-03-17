@@ -269,19 +269,23 @@ with DAG(
                     FROM {stg_table} stg
                     WHERE {join_conditions}
                       AND tgt.IS_ACTIVE = TRUE
+                      -- Update tylko wtedy, gdy dane faktycznie się różnią
                       AND {tgt_hash_expr} != {stg_hash_expr}
                 """
                 cs.execute(update_sql)
                 
-                insert_sql = f"""
-                    INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
-                    SELECT {cols_str}, stg.{logical_date_col}, NULL, TRUE
-                    FROM {stg_table} stg
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM {table}_scd2 tgt 
-                        WHERE {join_conditions} AND tgt.IS_ACTIVE = TRUE
-                    )
-                """
+               insert_sql = f"""
+                            INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_ACTIVE)
+                            SELECT {stg_cols_prefixed}, stg.{logical_date_col}, NULL, TRUE
+                            FROM {stg_table} stg
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM {table}_scd2 tgt 
+                                WHERE {join_conditions} 
+                                  AND tgt.IS_ACTIVE = TRUE
+                                  -- Kluczowe: nie wstawiamy, jeśli identyczny rekord już jest aktywny
+                                  AND {tgt_hash_expr} = {stg_hash_expr}
+                            )
+                        """
                 cs.execute(insert_sql)
                 print(f"SCD2 applied for {table}.")
                 
