@@ -1,0 +1,12 @@
+#copy this file to config.yml and fill in the values
+
+snowflake:
+  account: $account_locator
+  database: GTFS_TEST
+  password: $user_password
+  role: $user_role
+  schema: SCHEDULE_DATA_MARTS
+  user: $user_name
+  warehouse: COMPUTE_WH
+
+exports_dir: $exports_dir

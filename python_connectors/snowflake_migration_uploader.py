@@ -18,8 +18,13 @@ from pathlib import Path
 import yaml
 import snowflake.connector
 
+# load credentials
+with open(Path(__file__).parent / "config.yml", "r") as f:
+    cfg = yaml.safe_load(f)
+sf = cfg["snowflake"]
+
 # === CONFIG ===
-EXPORTS_DIR = r"g:\Archiwum\Projekcik\snowflake_exports"
+EXPORTS_DIR = cfg["exports_dir"]
 SF_DATABASE = "GTFS_TEST"
 FILE_FORMAT = "PARQUET_LOGICAL"
 # stage name will be created inside the schema: e.g. STAGE_parquet (schema-scoped)
@@ -27,11 +32,6 @@ STAGE_SUFFIX = "_PARQUET_STAGE"
 # only strip timestamp-like suffixes from filenames when deriving table name
 _SUFFIX_RE = re.compile(r"(_\d{4}-\d{2}-\d{2}|_\d{8}T\d{6}Z)$", re.IGNORECASE)
 # === /CONFIG ===
-
-# load credentials
-with open(Path(__file__).parent / "config.yml", "r") as f:
-    cfg = yaml.safe_load(f)
-sf = cfg["snowflake"]
 
 
 def connect():

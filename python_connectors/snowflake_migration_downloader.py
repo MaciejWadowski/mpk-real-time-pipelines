@@ -38,7 +38,7 @@ SCHEMAS = [
     "TRIP_UPDATES",
     "WEATHER_API_STAGING",
 ]
-OUTPUT_DIR = r"g:\Archiwum\Projekcik\snowflake_exports"
+OUTPUT_DIR = cfg["exports_dir"]
 MAX_SIZE_MB = 50
 MIGRATION_META = Path(OUTPUT_DIR) / "migration_meta.json"
 
