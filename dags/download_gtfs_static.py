@@ -10,7 +10,6 @@ from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python import PythonVirtualenvOperator
 
 
-
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -30,6 +29,32 @@ def create_table_in_snowflake(ctx, table_name, df, schema):
     cs_local.execute(ddl)
     cs_local.close()
     print(f"Table {schema}.{table_name.upper()} created.")
+
+
+def generate_create_table_ddl(table_name, df, schema):
+    """
+    Generates a CREATE OR REPLACE TABLE DDL command based on a DataFrame's structure.
+    Mapping: integer -> NUMBER, float -> FLOAT, datetime -> TIMESTAMP_NTZ, others -> VARCHAR.
+    Column names are converted to uppercase.
+    Special case: the "load_timestamp" column is always mapped to TIMESTAMP_NTZ.
+    """
+    col_defs = []
+    for col, dtype in df.dtypes.items():
+        if col.lower() == "load_timestamp":
+            sf_type = "TIMESTAMP_NTZ"
+        else:
+            dtype_str = str(dtype).lower()
+            if "int" in dtype_str:
+                sf_type = "NUMBER"
+            elif "float" in dtype_str:
+                sf_type = "FLOAT"
+            elif "datetime" in dtype_str:
+                sf_type = "TIMESTAMP_NTZ"
+            else:
+                sf_type = "VARCHAR"
+        col_defs.append(f'"{col.upper()}" {sf_type}')
+    ddl = f'CREATE TABLE IF NOT EXISTS {schema}.{table_name.upper()} (\n  ' + ',\n  '.join(col_defs) + '\n);'
+    return ddl
 
 
 with DAG(
@@ -59,7 +84,6 @@ with DAG(
             print(f"Downloading data from: {url}")
             feed = gk.read_feed(url, dist_units="km")
             
-            # Add a new column "mode" to each table if present.
             if hasattr(feed, "routes"):
                 feed.routes["mode"] = mode_letter
             if hasattr(feed, "trips"):
@@ -77,7 +101,6 @@ with DAG(
 
             feeds.append(feed)
 
-        # Start merging from the first feed
         merged_feed = feeds[0]
         for feed in feeds[1:]:
             merged_feed.routes = pd.concat([merged_feed.routes, feed.routes], ignore_index=True).drop_duplicates()
@@ -122,39 +145,11 @@ with DAG(
         return merged_feed
 
 
-    def generate_create_table_ddl(table_name, df, schema):
-        """
-        Generates a CREATE OR REPLACE TABLE DDL command based on a DataFrame's structure.
-        Mapping: integer -> NUMBER, float -> FLOAT, datetime -> TIMESTAMP_NTZ, others -> VARCHAR.
-        Column names are converted to uppercase.
-        Special case: the "load_timestamp" column is always mapped to TIMESTAMP_NTZ.
-        """
-        col_defs = []
-        for col, dtype in df.dtypes.items():
-            # Check if the column is "load_timestamp" (case-insensitive) and force TIMESTAMP_NTZ.
-            if col.lower() == "load_timestamp":
-                sf_type = "TIMESTAMP_NTZ"
-            else:
-                dtype_str = str(dtype).lower()
-                if "int" in dtype_str:
-                    sf_type = "NUMBER"
-                elif "float" in dtype_str:
-                    sf_type = "FLOAT"
-                elif "datetime" in dtype_str:
-                    sf_type = "TIMESTAMP_NTZ"
-                else:
-                    sf_type = "VARCHAR"
-            col_defs.append(f'"{col.upper()}" {sf_type}')
-        ddl = f'CREATE TABLE IF NOT EXISTS {schema}.{table_name.upper()} (\n  ' + ',\n  '.join(col_defs) + '\n);'
-        return ddl
-
-
     def save_static_data_to_snowflake(ctx, merged_feed):
         """
         Creates tables in the SCHEDULE schema and uploads static GTFS data.
-        The tables are: ROUTES, TRIPS, STOP_TIMES, STOPS,
-        CALENDAR (if available) and CALENDAR_DATES (if available).
-        Before uploading, the tables are truncated.
+        The tables are loaded into STAGING tables with _STG suffix.
+        Before uploading, the staging tables are truncated.
         """
         cs = ctx.cursor()
         tables = ["routes", "trips", "stop_times", "stops"]
@@ -167,43 +162,142 @@ with DAG(
             
         for table in tables:
             df = getattr(merged_feed, table).reset_index(drop=True)
-            # Convert all column names to uppercase.
             df = df.rename(columns=lambda x: x.upper())
             
-            # Optionally remove timezone from any datetime columns.
-            # This ensures no column is timezone-aware.
             for col in df.select_dtypes(include=['datetimetz']).columns:
                 df[col] = df[col].dt.tz_localize(None)
             
-            create_table_in_snowflake(ctx, table, df, "SCHEDULE")
-            cs.execute("USE SCHEMA SCHEDULE")
-            print(f"Uploading static data for table {table.upper()} to Snowflake...")
+            stg_table = f"{table}_STG"
             
-            # Pass use_logical_type=True to help the connector correctly convert times.
+            create_table_in_snowflake(ctx, stg_table, df, "SCHEDULE")
+            cs.execute("USE SCHEMA SCHEDULE")
+            cs.execute(f"TRUNCATE TABLE IF EXISTS {stg_table.upper()}")
+            
+            print(f"Uploading static data for table {stg_table.upper()} to Snowflake...")
+            
             success, nchunks, nrows, _ = write_pandas(
-                ctx, df, table.upper(), auto_create_table=False, use_logical_type=True
+                ctx, df, stg_table.upper(), auto_create_table=False, use_logical_type=True
             )
             
             if success:
-                print(f"Table {table.upper()} uploaded successfully: {nrows} rows in {nchunks} chunks.\n")
+                print(f"Table {stg_table.upper()} uploaded successfully: {nrows} rows in {nchunks} chunks.\n")
             else:
-                print(f"Upload failed for table {table.upper()}.\n")
+                print(f"Upload failed for table {stg_table.upper()}.\n")
 
 
     def ingest_static_data_to_snowflake(**kwargs):
         """
-        Downloads and merges the GTFS feeds and uploads the merged static data to Snowflake.
+        Downloads and merges the GTFS feeds and uploads the merged static data to Snowflake staging tables.
         """
-        # Merge all feeds using the provided logical_date argument.
         merged_feed = merge_gtfs_feeds(kwargs['logical_date'])
         hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
         conn = hook.get_conn()
         save_static_data_to_snowflake(conn, merged_feed)
 
 
+    def load_data_from_staging(**kwargs):
+        """
+        Loads data from STAGING to Target tables based on configuration.
+        Applies SCD2 logic. The logical date column is automatically excluded from change tracking.
+        """
+        hook = SnowflakeHook(snowflake_conn_id='my_snowflake_conn')
+        conn = hook.get_conn()
+        cs = conn.cursor()
+    
+        table_config = {
+            "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": True},
+            "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": False},
+            "STOPS": {"pks": ["STOP_ID"], "use_scd2": False},
+            "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": False},
+            "CALENDAR_DATES": {"pks": ["SERVICE_ID", "DATE"], "use_scd2": False},
+            "STOP_TIMES": {"pks": ["TRIP_ID", "STOP_SEQUENCE"], "use_scd2": False},
+            "SHAPES": {"pks": ["SHAPE_ID", "SHAPE_PT_SEQUENCE"], "use_scd2": False}
+        }
+    
+        cs.execute("USE SCHEMA SCHEDULE")
+    
+        for table, config in table_config.items():
+            pks = [pk.upper() for pk in config["pks"]]
+            use_scd2 = config.get("use_scd2", False)
+            
+            logical_date_col = config.get("logical_date_col", "LOAD_TIMESTAMP").upper()
+            
+            exclude_cols = [col.upper() for col in config.get("scd2_exclude_cols", [])]
+            
+            if logical_date_col not in exclude_cols:
+                exclude_cols.append(logical_date_col)
+                
+            stg_table = f"{table}_STG"
+    
+            create_target_ddl = f"CREATE TABLE IF NOT EXISTS {table} CLONE {stg_table};"
+            cs.execute(create_target_ddl)
+    
+            cs.execute(f"SELECT * FROM {stg_table} LIMIT 1")
+            columns = [col[0].upper() for col in cs.description]
+            cols_str = ", ".join(columns)
+    
+            if use_scd2:
+                print(f"Applying SCD2 logic for {table}...")
+            
+                try:
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_FROM TIMESTAMP_NTZ;")
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS VALID_TO TIMESTAMP_NTZ;")
+                    cs.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS IS_CURRENT BOOLEAN;")
+                except Exception:
+                    pass
+    
+                cols_to_hash = [c for c in columns if c not in pks and c not in exclude_cols]
+                
+                if not cols_to_hash:
+                    print(f"Brak kolumn do śledzenia zmian dla {table}. Pomijam SCD2.")
+                    continue
+    
+                tgt_hash_expr = "HASH(" + ", ".join([f"tgt.{c}" for c in cols_to_hash]) + ")"
+                stg_hash_expr = "HASH(" + ", ".join([f"stg.{c}" for c in cols_to_hash]) + ")"
+    
+                join_conditions = " AND ".join([f"tgt.{pk} = stg.{pk}" for pk in pks])
+    
+                update_sql = f"""
+                    UPDATE {table}_scd2 tgt
+                    SET tgt.VALID_TO = stg.{logical_date_col},
+                        tgt.IS_CURRENT = FALSE
+                    FROM {stg_table} stg
+                    WHERE {join_conditions}
+                      AND tgt.IS_CURRENT = TRUE
+                      AND {tgt_hash_expr} != {stg_hash_expr}
+                """
+                cs.execute(update_sql)
+                
+               insert_sql = f"""
+                            INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_CURRENT)
+                            SELECT {stg_cols_prefixed}, stg.{logical_date_col}, NULL, TRUE
+                            FROM {stg_table} stg
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM {table}_scd2 tgt 
+                                WHERE {join_conditions} 
+                                  AND tgt.IS_CURRENT = TRUE
+                                  AND {tgt_hash_expr} = {stg_hash_expr}
+                            )
+                        """
+                cs.execute(insert_sql)
+                print(f"SCD2 applied for {table}.")
+                
+            else:
+                insert_sql = f"""
+                    INSERT INTO {table} ({cols_str})
+                    SELECT {cols_str} FROM {stg_table}
+                """
+                cs.execute(insert_sql)
+                print(f"Simple INSERT completed for {table}.")
+    
     download_gtfs_task = PythonOperator(
         task_id='download_gtfs_data',
         python_callable=ingest_static_data_to_snowflake,
+    )
+
+    load_data_from_staging_task = PythonOperator(
+        task_id='load_data_from_staging',
+        python_callable=load_data_from_staging,
     )
 
     def run_dbt(**context):
@@ -234,4 +328,4 @@ with DAG(
         dag=dag,
     )
 
-    download_gtfs_task >> bash_dbt_operator
+    download_gtfs_task >> load_data_from_staging_task >> bash_dbt_operator
