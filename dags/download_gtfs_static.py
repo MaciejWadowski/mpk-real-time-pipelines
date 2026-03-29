@@ -205,7 +205,7 @@ with DAG(
         cs = conn.cursor()
     
         table_config = {
-            "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": True},
+            "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": False},
             "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": False},
             "STOPS": {"pks": ["STOP_ID"], "use_scd2": False},
             "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": False},
@@ -235,6 +235,8 @@ with DAG(
             cs.execute(f"SELECT * FROM {stg_table} LIMIT 1")
             columns = [col[0].upper() for col in cs.description]
             cols_str = ", ".join(columns)
+
+            stg_cols_prefixed = ", ".join([f"stg.{c}" for c in columns])
     
             if use_scd2:
                 print(f"Applying SCD2 logic for {table}...")
@@ -268,7 +270,7 @@ with DAG(
                 """
                 cs.execute(update_sql)
                 
-               insert_sql = f"""
+                insert_sql = f"""
                             INSERT INTO {table}_scd2 ({cols_str}, VALID_FROM, VALID_TO, IS_CURRENT)
                             SELECT {stg_cols_prefixed}, stg.{logical_date_col}, NULL, TRUE
                             FROM {stg_table} stg
