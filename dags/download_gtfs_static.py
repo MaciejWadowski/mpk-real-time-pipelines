@@ -205,7 +205,7 @@ with DAG(
         cs = conn.cursor()
     
         table_config = {
-            "ROUTES": {"pks": ["ROUTE_ID"], "use_scd2": False},
+            "ROUTES": {"pks": ["ROUTE_ID", "MODE"], "use_scd2": True},
             "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": False},
             "STOPS": {"pks": ["STOP_ID"], "use_scd2": False},
             "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": False},
