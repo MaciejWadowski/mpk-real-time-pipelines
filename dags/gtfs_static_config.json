@@ -1,0 +1,9 @@
+{
+    "ROUTES": {"pks": ["ROUTE_ID", "MODE"], "use_scd2": true},
+    "TRIPS": {"pks": ["TRIP_ID", "MODE"], "use_scd2": false},
+    "STOPS": {"pks": ["STOP_ID"], "use_scd2": false},
+    "CALENDAR": {"pks": ["SERVICE_ID"], "use_scd2": false},
+    "CALENDAR_DATES": {"pks": ["SERVICE_ID", "DATE"], "use_scd2": false},
+    "STOP_TIMES": {"pks": ["TRIP_ID", "STOP_SEQUENCE"], "use_scd2": false},
+    "SHAPES": {"pks": ["SHAPE_ID", "SHAPE_PT_SEQUENCE"], "use_scd2": false}
+}
