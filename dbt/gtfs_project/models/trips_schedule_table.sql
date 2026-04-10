@@ -1,4 +1,4 @@
-{{ config(materialized='table', alias='TRIPS_SCHEDULE_TABLE_NEW')}}
+{{ config(materialized='table', alias='TRIPS_SCHEDULE_TABLE')}}
 
 WITH calendar AS (
   SELECT
@@ -48,10 +48,11 @@ JOIN {{ source('schedule', 'stops') }} C
   ON A.STOP_ID = C.STOP_ID
   AND A.LOAD_TIMESTAMP = C.LOAD_TIMESTAMP
   AND A.MODE = C.MODE
-JOIN {{ source('schedule', 'routes') }} D 
+JOIN {{ source('schedule', 'routes_scd2') }} D
   ON B.ROUTE_ID = D.ROUTE_ID
-  AND A.LOAD_TIMESTAMP = D.LOAD_TIMESTAMP
   AND B.MODE = D.MODE
+  AND A.LOAD_TIMESTAMP >= D.VALID_FROM 
+  AND (A.LOAD_TIMESTAMP < D.VALID_TO OR D.VALID_TO IS NULL)
 JOIN calendar E
   ON B.SERVICE_ID = E.service_id
   AND B.MODE = E.mode
