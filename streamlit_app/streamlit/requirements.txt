@@ -1,0 +1,6 @@
+streamlit
+pandas
+snowflake-sqlalchemy
+plotly
+python-dotenv
+streamlit-autorefresh

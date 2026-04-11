@@ -1,0 +1,10 @@
+version: '3.9'
+services:
+  streamlit:
+    build: .
+    volumes:
+      - ./streamlit:/app
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
