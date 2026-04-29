@@ -82,7 +82,7 @@ def _apply_scd2(cs, stg_table, target_table, columns, pks, logical_date_col, exc
         SET tgt.VALID_TO = stg.{logical_date_col}, tgt.IS_CURRENT = FALSE
         FROM {stg_table} stg
         WHERE {join} AND tgt.IS_CURRENT = TRUE AND {tgt_hash} != {stg_hash}
-          AND stg.LOAD_TIMESTAMP = {latest_ts_subquery}
+          AND stg.LOAD_TIMESTAMP = {latest_ts_subquery}"""
 
     insert_sql = f"""
         INSERT INTO {target_table} ({cols_str}, VALID_FROM, VALID_TO, IS_CURRENT)
