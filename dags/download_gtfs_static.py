@@ -68,10 +68,12 @@ def _apply_scd2(cs, stg_table, target_table, columns, pks, logical_date_col, exc
 
     join = " AND ".join(f"tgt.{pk} = stg.{pk}" for pk in pks)
     join_any = " AND ".join(f"existing.{pk} = stg.{pk}" for pk in pks)
+
     tgt_hash = "HASH(" + ", ".join(f"tgt.{c}" for c in cols_to_hash) + ")"
     stg_hash = "HASH(" + ", ".join(f"stg.{c}" for c in cols_to_hash) + ")"
     cols_str = ", ".join(columns)
     stg_cols = ", ".join(f"stg.{c}" for c in columns)
+
 
     latest_ts_subquery = f"(SELECT MAX(LOAD_TIMESTAMP) FROM {stg_table})"
 
@@ -81,7 +83,7 @@ def _apply_scd2(cs, stg_table, target_table, columns, pks, logical_date_col, exc
         FROM {stg_table} stg
         WHERE {join} AND tgt.IS_CURRENT = TRUE AND {tgt_hash} != {stg_hash}
           AND stg.LOAD_TIMESTAMP = {latest_ts_subquery}
-    """
+
     insert_sql = f"""
         INSERT INTO {target_table} ({cols_str}, VALID_FROM, VALID_TO, IS_CURRENT)
         SELECT {stg_cols},
@@ -95,6 +97,7 @@ def _apply_scd2(cs, stg_table, target_table, columns, pks, logical_date_col, exc
         FROM {stg_table} stg
         WHERE stg.LOAD_TIMESTAMP = {latest_ts_subquery}
           AND NOT EXISTS (
+
             SELECT 1 FROM {target_table} tgt
             WHERE {join} AND tgt.IS_CURRENT = TRUE AND {tgt_hash} = {stg_hash}
         )
@@ -241,11 +244,13 @@ with DAG(
                     print(f"SCD2 applied for {table}.")
                 else:
                     cols = ", ".join(columns)
+                    
                     cs.execute(f"""
                         INSERT INTO {target_table} ({cols})
                         SELECT {cols} FROM {stg_table}
                         WHERE LOAD_TIMESTAMP = (SELECT MAX(LOAD_TIMESTAMP) FROM {stg_table})
                     """)
+
                     print(f"Simple INSERT completed for {table}.")
         finally:
             conn.close()
