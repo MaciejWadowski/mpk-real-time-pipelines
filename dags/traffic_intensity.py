@@ -244,7 +244,7 @@ def save_traffic_data_to_disk(traffic_data: list[dict[str, Any]], logical_date: 
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     file_path = os.path.join(output_dir, f"traffic_{logical_date.format('YYYYMMDD_HHmm')}.json")
     with open(file_path, 'w') as f:
-        json.dump(obj=traffic_data, f)
+        json.dump(traffic_data, f)
     return file_path
 
 
