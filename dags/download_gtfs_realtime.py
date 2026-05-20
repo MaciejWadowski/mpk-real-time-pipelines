@@ -14,7 +14,7 @@ from airflow.operators.python import PythonOperator
 
 # Configuration variables
 DOWNLOAD_INTERVAL_MINUTES = 1  # Download every 1 minute
-AGGREGATION_INTERVAL_MINUTES = 60  # Upload aggregated batch every 30 minutes
+AGGREGATION_INTERVAL_MINUTES = 30  # Upload aggregated batch every 30 minutes
 
 # Destination schema for trip updates (historical table resides here)
 SF_SCHEMA_TRIP_UPDATES = "TRIP_UPDATES"
