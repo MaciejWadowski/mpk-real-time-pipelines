@@ -1,143 +1,155 @@
-import pytest
+import json
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
+from pendulum import DateTime
+
 from dags.traffic_intensity import (
     fetch_tomtom_traffic_intensity,
-    get_gtfs_stops_from_snowflake,
     create_traffic_intensity_table_if_not_exists,
     insert_traffic_data_to_snowflake,
     process_traffic_intensity,
-    BATCH_SIZE,
+    save_traffic_data_to_disk,
+    load_traffic_data_from_disk,
+    purge_traffic_data_from_disk,
 )
-from pendulum import DateTime
 
-SAMPLE_PAYLOAD = {
-    "flowSegmentData": {
-        "frc": "FRC4",
-        "currentSpeed": 39,
-        "freeFlowSpeed": 39,
-        "currentTravelTime": 124,
-        "freeFlowTravelTime": 124,
-        "confidence": 1,
-        "roadClosure": False,
-        "coordinates": {
-            "coordinate": [
-                {"latitude": 50.074295556798191, "longitude": 19.945879839348095}
-                # ... truncated for brevity ...
-            ]
-        },
-        "@version": "4"
+
+def test_fetch_tomtom_traffic_intensity_success(monkeypatch):
+    expected_json = {
+        'flowSegmentData': {
+            'currentSpeed': 23.5,
+            'freeFlowSpeed': 45.0,
+            'currentTravelTime': 70.0,
+            'freeFlowTravelTime': 40.0,
+            'confidence': 0.98,
+        }
     }
-}
 
-@patch("dags.traffic_intensity.requests.get")
-def test_fetch_tomtom_traffic_intensity_success(mock_get) -> None:
-    mock_response = Mock()
-    mock_response.raise_for_status = Mock()
-    mock_response.json.return_value = SAMPLE_PAYLOAD
-    mock_get.return_value = mock_response
+    response_mock = Mock()
+    response_mock.raise_for_status = Mock()
+    response_mock.json.return_value = expected_json
 
-    result = fetch_tomtom_traffic_intensity(50.0, 19.9, "dummy_api_key")
+    get_mock = Mock(return_value=response_mock)
+    monkeypatch.setattr('dags.traffic_intensity.requests.get', get_mock)
+
+    result = fetch_tomtom_traffic_intensity(lat=50.0, lon=20.0, api_key='key')
+
     assert result == {
-        "current_speed": 39,
-        "free_flow_speed": 39,
-        "current_travel_time": 124,
-        "free_flow_travel_time": 124,
-        "confidence": 1
+        'current_speed': 23.5,
+        'free_flow_speed': 45.0,
+        'current_travel_time': 70.0,
+        'free_flow_travel_time': 40.0,
+        'confidence': 0.98,
     }
-    mock_get.assert_called_once()
+    get_mock.assert_called_once()
 
-@patch("dags.traffic_intensity.requests.get")
-@patch("dags.traffic_intensity.time.sleep", return_value=None)
-def test_fetch_tomtom_traffic_intensity_unsuccessfull(_, mock_get) -> None:
-    mock_response = Mock()
-    mock_response.raise_for_status = Mock()
-    mock_response.json.return_value = SAMPLE_PAYLOAD
-    mock_get.side_effect = [
-        Exception("Network error"),
-        Exception("Network error"),
-        mock_response
-    ]
 
-    result = fetch_tomtom_traffic_intensity(50.0, 19.9, "dummy_api_key")
-    assert result == {
-        "current_speed": 39,
-        "free_flow_speed": 39,
-        "current_travel_time": 124,
-        "free_flow_travel_time": 124,
-        "confidence": 1
-    }
-    assert mock_get.call_count == 3
-
-def test_get_gtfs_stops_from_snowflake():
-    mock_hook = Mock()
-    mock_hook.get_records.return_value = [
-        ("StopA", 50.1, 19.9),
-        ("StopB", 50.2, 20.0),
-    ]
-    logical_date = DateTime(2025, 7, 29)
-    result = get_gtfs_stops_from_snowflake(logical_date, mock_hook)
-    assert result == [
-        {"STOP_NAME": "StopA", "stop_lat": 50.1, "stop_lon": 19.9},
-        {"STOP_NAME": "StopB", "stop_lat": 50.2, "stop_lon": 20.0},
-    ]
-    assert mock_hook.get_records.called
-
-def test_create_traffic_intensity_table_if_not_exists():
-    mock_hook = Mock()
-    create_traffic_intensity_table_if_not_exists(mock_hook)
-    assert mock_hook.run.called
-    sql = mock_hook.run.call_args[0][0]
-    assert "CREATE TABLE IF NOT EXISTS" in sql
-    assert "GTFS_TEST.SCHEDULE.TRAFFIC_INTENSITY" in sql
-
-def test_insert_traffic_data_to_snowflake():
-    mock_hook = Mock()
+def test_insert_traffic_data_to_snowflake_calls_create_table_and_insert(monkeypatch):
+    hook = Mock()
     traffic_data = [
         {
-            "STOP_NAME": "StopA",
-            "stop_lat": 50.1,
-            "stop_lon": 19.9,
-            "current_speed": 39,
-            "free_flow_speed": 39,
-            "current_travel_time": 124,
-            "free_flow_travel_time": 124,
-            "confidence": 1,
-            "load_timestamp": "2025-07-29"
+            'STOP_NAME': "Test Stop",
+            'stop_lat': 50.0,
+            'stop_lon': 20.0,
+            'current_speed': 10.0,
+            'free_flow_speed': 20.0,
+            'current_travel_time': 50.0,
+            'free_flow_travel_time': 25.0,
+            'confidence': 0.9,
+            'load_timestamp': '2026-05-17',
         }
     ]
-    insert_traffic_data_to_snowflake(traffic_data, mock_hook)
-    assert mock_hook.run.called
-    sql = mock_hook.run.call_args[0][0]
-    assert "INSERT INTO GTFS_TEST.SCHEDULE.TRAFFIC_INTENSITY" in sql
-    assert "'StopA'" in sql
 
-def test_insert_traffic_data_to_snowflake_empty():
-    mock_hook = Mock()
-    insert_traffic_data_to_snowflake([], mock_hook)
-    mock_hook.run.assert_not_called()
+    insert_traffic_data_to_snowflake(traffic_data, hook)
 
-@patch("dags.traffic_intensity.fetch_tomtom_traffic_intensity")
-@patch("dags.traffic_intensity.insert_traffic_data_to_snowflake")
-@patch("dags.traffic_intensity.create_traffic_intensity_table_if_not_exists")
-def test_process_traffic_intensity_batches(mock_create_table, mock_insert, mock_fetch):
-    # Prepare stops more than BATCH_SIZE to test batching
-    stops = [
-        {"STOP_NAME": f"Stop{i}", "stop_lat": 50.0 + i, "stop_lon": 19.0 + i}
-        for i in range(BATCH_SIZE + 5)
-    ]
-    logical_date = DateTime(2025, 7, 29)
-    api_key = "dummy"
-    mock_hook = Mock()
-    mock_fetch.return_value = {
-        "current_speed": 39,
-        "free_flow_speed": 39,
-        "current_travel_time": 124,
-        "free_flow_travel_time": 124,
-        "confidence": 1
+    assert hook.run.call_count == 2
+    assert 'CREATE TABLE IF NOT EXISTS' in hook.run.call_args_list[0][0][0]
+    assert 'INSERT INTO GTFS_TEST.SCHEDULE.TRAFFIC_INTENSITY' in hook.run.call_args_list[1][0][0]
+    assert "Test Stop" in hook.run.call_args_list[1][0][0]
+
+
+def test_insert_traffic_data_to_snowflake_empty_only_creates_table():
+    hook = Mock()
+    insert_traffic_data_to_snowflake([], hook)
+
+    assert hook.run.call_count == 1
+    assert 'CREATE TABLE IF NOT EXISTS' in hook.run.call_args[0][0]
+
+
+def test_process_traffic_intensity_uses_stubbed_fetch(monkeypatch):
+    fake_stops = {
+        'Stop A': (50.0, 20.0),
+        'Stop B': (50.1, 20.1),
     }
 
-    process_traffic_intensity(stops, logical_date, api_key, mock_hook)
+    monkeypatch.setattr('dags.traffic_intensity.STOPS_INCLUDED', fake_stops)
 
-    # Should create table once
-    mock_create_table.assert_called_once_with(hook=mock_hook)
-    assert mock_insert.call_count == 1
+    fetched_values = [
+        {
+            'current_speed': 10.0,
+            'free_flow_speed': 20.0,
+            'current_travel_time': 30.0,
+            'free_flow_travel_time': 40.0,
+            'confidence': 0.5,
+        },
+        {
+            'current_speed': 12.0,
+            'free_flow_speed': 22.0,
+            'current_travel_time': 32.0,
+            'free_flow_travel_time': 42.0,
+            'confidence': 0.8,
+        },
+    ]
+
+    def fake_fetch(lat, lon, api_key):
+        return fetched_values.pop(0)
+
+    monkeypatch.setattr('dags.traffic_intensity.fetch_tomtom_traffic_intensity', fake_fetch)
+
+    result = process_traffic_intensity(logical_date=DateTime(2026, 5, 17), api_keys=['key1', 'key2'])
+
+    assert len(result) == 2
+    assert result[0]['STOP_NAME'] == 'Stop A'
+    assert result[1]['STOP_NAME'] == 'Stop B'
+    assert result[0]['current_speed'] == 10.0
+    assert result[1]['current_speed'] == 12.0
+
+
+def test_save_load_and_purge_traffic_data_roundtrip(tmp_path):
+    traffic_data = [
+        {
+            'STOP_NAME': 'Test Stop',
+            'stop_lat': 50.0,
+            'stop_lon': 20.0,
+            'current_speed': 10.0,
+            'free_flow_speed': 20.0,
+            'current_travel_time': 50.0,
+            'free_flow_travel_time': 25.0,
+            'confidence': 0.9,
+            'load_timestamp': '2026-05-17',
+        }
+    ]
+
+    file_path = save_traffic_data_to_disk(traffic_data, DateTime(2026, 5, 17, 7, 15), str(tmp_path))
+    assert Path(file_path).exists()
+
+    loaded_data = load_traffic_data_from_disk(str(tmp_path))
+    assert loaded_data == traffic_data
+
+    purge_traffic_data_from_disk(str(tmp_path))
+    assert not any(Path(str(tmp_path)).glob('traffic_*.json'))
+
+
+def test_load_traffic_data_from_disk_skips_invalid_json(tmp_path, capsys):
+    valid = tmp_path / 'traffic_20260517_0715.json'
+    invalid = tmp_path / 'traffic_20260517_0730.json'
+    valid.write_text(json.dumps([{'STOP_NAME': 'Valid Stop'}]))
+    invalid.write_text('{ invalid json }')
+
+    result = load_traffic_data_from_disk(str(tmp_path))
+
+    assert result == [{'STOP_NAME': 'Valid Stop'}]
+    captured = capsys.readouterr()
+    assert 'Error loading' in captured.out
