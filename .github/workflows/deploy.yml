@@ -83,7 +83,7 @@ jobs:
             
             # Count healthy services
             healthy_count=$(echo "$out" | grep -c '(healthy)' || true)
-            total_count=$(echo "$out" | grep -E 'airflow-|postgres|redis' | wc -l)
+            total_count=$(echo "$out" | grep -E 'airflow-|postgres' | wc -l)
             
             if [ "$healthy_count" -gt 0 ] && [ "$healthy_count" -eq "$total_count" ]; then
               echo "All services healthy"

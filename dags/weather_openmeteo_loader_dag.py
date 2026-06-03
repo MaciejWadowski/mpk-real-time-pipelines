@@ -46,11 +46,10 @@ MIN15_FIELDS = [
 ]
 
 # Snowflake target
-DB = "GTFS_TEST"
 SCHEMA = "WEATHER_API_STAGING"
-HOURLY_TBL     = f"{DB}.{SCHEMA}.HOURLY_WEATHER"
-MIN15_TBL      = f"{DB}.{SCHEMA}.MINUTELY_15_WEATHER"
-LOCATIONS_TBL  = f"{DB}.{SCHEMA}.DISTRICT_LOCATIONS"
+HOURLY_TBL     = "HOURLY_WEATHER"
+MIN15_TBL      = "MINUTELY_15_WEATHER"
+LOCATIONS_TBL  = "DISTRICT_LOCATIONS"
 
 # Snowflake Airflow connection id
 SNOWFLAKE_CONN_ID = "my_snowflake_conn"
@@ -96,9 +95,10 @@ def ymd(d: date) -> str:
     return d.strftime("%Y-%m-%d")
 
 def create_schema_and_tables(conn):
-    logger.info("Ensuring schema and core tables exist: %s.%s", DB, SCHEMA)
+    logger.info("Ensuring schema and core tables exist: %s", SCHEMA)
     cur = conn.cursor()
-    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {DB}.{SCHEMA};")
+    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA};")
+    cur.execute(f"USE SCHEMA {SCHEMA};")
 
     cur.execute(f"""
       CREATE TABLE IF NOT EXISTS {HOURLY_TBL} (
