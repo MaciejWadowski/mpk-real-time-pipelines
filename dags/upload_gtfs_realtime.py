@@ -35,6 +35,7 @@ def setup_cache_directory():
     os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
     os.makedirs(os.path.join(LOCAL_CACHE_DIR, "trip_updates"), exist_ok=True)
     os.makedirs(os.path.join(LOCAL_CACHE_DIR, "vehicle_positions"), exist_ok=True)
+    os.makedirs(os.path.join(LOCAL_CACHE_DIR, "traffic_intensity"), exist_ok=True)
 
 def create_table_in_snowflake(ctx, table_name, df, schema):
     """
