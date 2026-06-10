@@ -26,12 +26,10 @@ with DAG(
 ) as dag:
 
     @task
-    def fetch_and_save_traffic_intensity(logical_date: str | DateTime) -> str:
-        if isinstance(logical_date, str):
-            logical_date = DateTime.parse(logical_date)
+    def fetch_and_save_traffic_intensity(logical_date: DateTime) -> str:
         api_keys = Variable.get(TOMTOM_API_KEY_VAR, deserialize_json=True)
         traffic_data = process_traffic_intensity(logical_date=logical_date, api_keys=api_keys)
         file_path = save_traffic_data_to_disk(traffic_data, logical_date, TRAFFIC_DATA_DIR)
         return file_path
 
-    fetch_and_save_traffic_intensity(logical_date="{{ logical_date }}")
+    fetch_and_save_traffic_intensity(logical_date="{{ logical_date | ds }}")
