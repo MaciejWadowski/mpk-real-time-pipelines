@@ -82,6 +82,19 @@ services:
       - postgres
       - airflow-init
 
+  airflow-cli:
+    <<: *airflow-common
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    # Workaround for entrypoint issue. See: https://github.com/apache/airflow/issues/16252
+    command:
+      - bash
+      - -c
+      - airflow
+
   airflow-init:
     <<: *airflow-common
     entrypoint: /bin/bash
