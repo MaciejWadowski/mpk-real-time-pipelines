@@ -238,6 +238,16 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+  streamlit-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local

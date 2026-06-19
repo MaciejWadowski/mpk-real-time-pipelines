@@ -1,0 +1,8 @@
+streamlit>=1.35
+plotly>=5.22
+pydeck>=0.9
+snowflake-connector-python>=3.8
+pandas>=2.0
+python-dotenv>=1.0
+pyarrow>=15.0
+statsmodels>=0.14
