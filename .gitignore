@@ -181,3 +181,10 @@ logs/
 .DS_Store
 profiles.yml
 python_connectors/config.yml
+
+# Terraform
+infra/terraform.tfvars
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
