@@ -21,7 +21,7 @@ jobs:
       DBT_WAREHOUSE_STRONK: ${{ secrets.DBT_WAREHOUSE_STRONK }}
       TOM_TOM_API_KEY: ${{ secrets.TOMTOM_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           clean: false
 
