@@ -13,7 +13,7 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
   | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 
-echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] \
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] \
 https://download.docker.com/linux/ubuntu jammy stable" \
   > /etc/apt/sources.list.d/docker.list
 
@@ -25,6 +25,13 @@ systemctl start docker
 usermod -aG docker ubuntu
 
 echo "Docker installed: $(docker --version)"
+
+# ── Swap (safety net for 4GB instance) ────────────────────────────────────────
+fallocate -l 4G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
 # ── Clone repo ─────────────────────────────────────────────────────────────────
 APP_DIR=/opt/mpk
@@ -71,7 +78,7 @@ DBT_SCHEMA=${dbt_schema}
 DBT_WAREHOUSE=${dbt_warehouse}
 DBT_WAREHOUSE_STRONK=${dbt_warehouse_stronk}
 DBT_ROLE=${dbt_role}
-TOM_TOM_API_KEY=${tomtom_api_key}
+TOMTOM_API_KEY=${tomtom_api_key}
 EOF
 
 echo ".env written"

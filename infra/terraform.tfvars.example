@@ -4,7 +4,6 @@
 # ── AWS ────────────────────────────────────────────────────────────────────────
 region        = "eu-central-1"
 instance_type = "t4g.medium"
-key_name      = "your-ec2-keypair-name"   # must exist in AWS console
 my_ip         = "1.2.3.4/32"             # your home IP (curl ifconfig.me)
 
 # ── Airflow ────────────────────────────────────────────────────────────────────
@@ -29,6 +28,10 @@ dbt_role             = "GTFS_UPLOADER_ROLE"
 # ── TomTom ─────────────────────────────────────────────────────────────────────
 # JSON array — matches Airflow Variable format
 tomtom_api_key = "[\"key1\",\"key2\"]"
+
+# ── IAM ────────────────────────────────────────────────────────────────────────
+iam_initial_password = "ChangeMe@123"
+iam_users_csv        = "USER1,USER2,USER3"
 
 # ── Repo ───────────────────────────────────────────────────────────────────────
 repo_url = "https://github.com/MaciejWadowski/mpk-real-time-pipelines.git"

@@ -3,7 +3,7 @@ output "elastic_ip" {
 }
 
 output "ssh_command" {
-  value = "ssh -i ~/.ssh/<your-key>.pem ubuntu@${aws_eip.main.public_ip}"
+  value = "ssh -i ${local_sensitive_file.private_key.filename} ubuntu@${aws_eip.main.public_ip}"
 }
 
 output "airflow_ui" {
@@ -19,8 +19,8 @@ output "startup_log" {
   description = "Run this on the EC2 to watch the startup script progress"
 }
 
-output "iam_passwords" {
-  value     = { for u in local.users : u => random_password.users[u].result }
-  sensitive = true
-  description = "Retrieve with: terraform output -json iam_passwords"
+output "iam_initial_password" {
+  value       = var.iam_initial_password
+  sensitive   = true
+  description = "Shared initial password for all IAM users. Retrieve with: terraform output iam_initial_password"
 }

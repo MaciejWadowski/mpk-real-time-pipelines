@@ -3,11 +3,7 @@ variable "region" {
 }
 
 variable "instance_type" {
-  default = "t4g.medium"
-}
-
-variable "key_name" {
-  description = "Name of an existing EC2 key pair in your AWS account"
+  default = "c7i-flex.large"
 }
 
 variable "my_ip" {
@@ -42,7 +38,7 @@ variable "dbt_password" {
 }
 
 variable "dbt_account" {
-  description = "Snowflake account identifier, e.g. MVZGEOB-IT49192"
+  description = "Snowflake account identifier"
 }
 
 variable "dbt_database" {
@@ -68,4 +64,13 @@ variable "dbt_role" {
 variable "tomtom_api_key" {
   sensitive   = true
   description = "JSON array of TomTom API keys, e.g. [\"key1\",\"key2\"]"
+}
+
+variable "iam_initial_password" {
+  sensitive   = true
+  description = "Initial console password for all IAM users (password_reset_required=true)"
+}
+
+variable "iam_users_csv" {
+  description = "Comma-separated list of IAM usernames, e.g. USER1,USER2,USER3"
 }

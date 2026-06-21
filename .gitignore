@@ -184,6 +184,7 @@ python_connectors/config.yml
 
 # Terraform
 infra/terraform.tfvars
+infra/mpk-key.pem
 infra/.terraform/
 infra/.terraform.lock.hcl
 infra/terraform.tfstate
