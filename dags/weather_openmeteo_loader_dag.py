@@ -264,7 +264,7 @@ def run_fetch_and_load(**context):
     today = date.today()
     two_months_ago = today - timedelta(days=60)
     global_start = two_months_ago
-    global_end = today
+    global_end = today - timedelta(days=1)
 
     logger.info("DAG run date: %s. Global window: %s -> %s", today, global_start, global_end)
 
