@@ -154,6 +154,87 @@ All models live in `dbt/gtfs_project/models/` and are materialized as full-refre
 | `WEATHER_API_STAGING` | Hourly weather and district locations |
 | `SCHEDULE_DATA_MARTS` | dbt-transformed analytical models |
 
+## MCP Snowflake Server
+
+Exposes Snowflake query tools (`query`, `list_tables`, `describe_table`) to Claude via MCP stdio transport.
+
+### Build
+
+Run from repo root:
+
+```bash
+docker build -f dockerfiles/Dockerfile.mcp_snowflake -t mpk-mcp-snowflake .
+```
+
+### Add to Claude
+
+Edit `~/.claude.json` (Claude Code) or your Claude desktop config and add under `mcpServers`:
+
+**Option A — environment variables** (no file needed):
+
+```json
+{
+  "mcpServers": {
+    "snowflake": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-e", "SNOWFLAKE_ACCOUNT",
+        "-e", "SNOWFLAKE_USER",
+        "-e", "SNOWFLAKE_PASSWORD",
+        "-e", "SNOWFLAKE_DATABASE",
+        "-e", "SNOWFLAKE_WAREHOUSE",
+        "mpk-mcp-snowflake"
+      ],
+      "env": {
+        "SNOWFLAKE_ACCOUNT": "<your_account>",
+        "SNOWFLAKE_USER": "<your_user>",
+        "SNOWFLAKE_PASSWORD": "<your_password>",
+        "SNOWFLAKE_DATABASE": "GTFS_TEST",
+        "SNOWFLAKE_WAREHOUSE": "COMPUTE_WH"
+      }
+    }
+  }
+}
+```
+
+**Option B — mount `config.yml`** (same format as `python_connectors/config.yml`):
+
+```json
+{
+  "mcpServers": {
+    "snowflake": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "-v", "/absolute/path/to/python_connectors/config.yml:/app/config.yml",
+        "mpk-mcp-snowflake"
+      ]
+    }
+  }
+}
+```
+
+`config.yml` format:
+
+```yaml
+snowflake:
+  account: <your_account>
+  user: <your_user>
+  password: <your_password>
+  database: GTFS_TEST
+  warehouse: COMPUTE_WH
+  schema: SCHEDULE_DATA_MARTS   # default schema for list_tables
+```
+
+After saving config, restart Claude. The server exposes:
+
+| Tool | Description |
+|------|-------------|
+| `query` | Run any `SELECT` against Snowflake |
+| `list_tables` | List tables in a schema (default: `SCHEDULE_DATA_MARTS`) |
+| `describe_table` | Show columns and types for a table |
+
 ## Running Tests
 
 ```bash

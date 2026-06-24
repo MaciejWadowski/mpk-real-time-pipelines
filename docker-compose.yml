@@ -17,6 +17,8 @@ x-airflow-common:
     AIRFLOW_CONN_MY_SNOWFLAKE_CONN: snowflake://${DBT_USER}:${DBT_PASSWORD}@/${DBT_DATABASE}/${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}&account=${DBT_ACCOUNT}&database=${DBT_DATABASE}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     AIRFLOW_VAR_TOM_TOM_API_KEYS: ${TOMTOM_API_KEY}
+    AIRFLOW__WEBSERVER__WORKERS: '2'
+    AIRFLOW__WEBSERVER__WORKER_REFRESH_NUM_WORKERS: '1'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
@@ -53,6 +55,10 @@ services:
   airflow-webserver:
     <<: *airflow-common
     command: webserver
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     ports:
       - "8080:8080"
     healthcheck:
@@ -61,10 +67,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 800M
     restart: always
     depends_on:
       - postgres
@@ -77,7 +79,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 3G
     depends_on:
       - postgres
       - airflow-init

@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir mcp snowflake-connector-python pyyaml
+
+COPY python_connectors/mcp_snowflake_server.py .
+
+CMD ["python", "mcp_snowflake_server.py"]

@@ -129,6 +129,7 @@ celerybeat.pid
 
 # Environments
 .env
+.mcp.json
 .venv
 env/
 venv/
@@ -180,3 +181,11 @@ logs/
 .DS_Store
 profiles.yml
 python_connectors/config.yml
+
+# Terraform
+infra/terraform.tfvars
+infra/mpk-key.pem
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate
+infra/terraform.tfstate.backup

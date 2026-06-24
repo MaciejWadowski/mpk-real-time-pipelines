@@ -1,0 +1,37 @@
+# Copy this file to terraform.tfvars and fill in real values.
+# terraform.tfvars is gitignored — never commit secrets.
+
+# ── AWS ────────────────────────────────────────────────────────────────────────
+region        = "eu-central-1"
+instance_type = "t4g.medium"
+my_ip         = "1.2.3.4/32"             # your home IP (curl ifconfig.me)
+
+# ── Airflow ────────────────────────────────────────────────────────────────────
+postgres_user     = "airflow"
+postgres_password = "changeme"
+postgres_db       = "airflow"
+
+# Generate with:
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+airflow_fernet_key = "your-fernet-key-here"
+
+# ── Snowflake / dbt ────────────────────────────────────────────────────────────
+dbt_user             = "YOUR_SNOWFLAKE_USER"
+dbt_password         = "your-snowflake-password"
+dbt_account          = "MVZGEOB-IT49192"
+dbt_database         = "GTFS_TEST"
+dbt_schema           = "SCHEDULE_DATA_MARTS"
+dbt_warehouse        = "COMPUTE_WH"
+dbt_warehouse_stronk = "COMPUTE_WH"
+dbt_role             = "GTFS_UPLOADER_ROLE"
+
+# ── TomTom ─────────────────────────────────────────────────────────────────────
+# JSON array — matches Airflow Variable format
+tomtom_api_key = "[\"key1\",\"key2\"]"
+
+# ── IAM ────────────────────────────────────────────────────────────────────────
+iam_initial_password = "ChangeMe@123"
+iam_users_csv        = "USER1,USER2,USER3"
+
+# ── Repo ───────────────────────────────────────────────────────────────────────
+repo_url = "https://github.com/MaciejWadowski/mpk-real-time-pipelines.git"
