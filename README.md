@@ -21,11 +21,11 @@ TomTom (traffic)   ───┘     (Docker)           (warehouse)     (transfor
 
 ### Tech Stack
 
-- **Orchestration**: Apache Airflow 2.10.5 (CeleryExecutor)
+- **Orchestration**: Apache Airflow 2.10.5 (LocalExecutor)
 - **Data Warehouse**: Snowflake
 - **Transformation**: dbt-snowflake 1.9.4
 - **Ingestion**: Python (requests, pandas, gtfs-realtime-bindings)
-- **Infrastructure**: Docker Compose, Redis, PostgreSQL
+- **Infrastructure**: Docker Compose, dedicated PostgreSQL metadata database
 - **CI/CD**: GitHub Actions
 - **Analysis**: Jupyter Notebooks
 
@@ -62,55 +62,24 @@ tests/                       # pytest test suite
 1. **Create environment file**:
    ```bash
    cp .env-sample .env
-   # Edit .env - set POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, AIRFLOW_FERNET_KEY
+   # Edit .env - set AIRFLOW_DB_*, AIRFLOW_FERNET_KEY, DBT_* and TOMTOM_API_KEY
    ```
 
 2. **Start Airflow and initialize the database**:
    ```bash
-   docker compose up airflow-webserver -d
-   docker compose run airflow-webserver airflow db init
+   docker compose up -d --build
    ```
 
-3. **Create admin user**:
-   ```bash
-   docker compose run airflow-webserver airflow users create \
-     --username admin \
-     --password admin \
-     --firstname Admin \
-     --lastname User \
-     --role Admin \
-     --email admin@example.com
-   ```
+   The `airflow-init` service migrates the Airflow metadata database and creates the admin user.
+   The Snowflake connection is injected from `DBT_*` variables in `.env`.
 
-4. **Add Snowflake connection**:
-   ```bash
-   docker compose run airflow-webserver airflow connections add my_snowflake_conn \
-     --conn-type snowflake \
-     --conn-login "<your_username>" \
-     --conn-password "<your_password>" \
-     --conn-schema "SCHEDULE" \
-     --conn-extra '{
-       "account": "<your_snowflake_account>",
-       "warehouse": "COMPUTE_WH",
-       "database": "GTFS_TEST",
-       "role": "GTFS_UPLOADER_ROLE",
-       "insecure_mode": false
-     }'
-   ```
-
-5. **Start all services**:
-   ```bash
-   docker compose up -d
-   ```
-
-6. **Access Airflow UI**: [http://localhost:8080](http://localhost:8080)
+3. **Access Airflow UI**: [http://localhost:8080](http://localhost:8080)
 
 ### dbt Setup
 
 ```bash
 cd dbt/gtfs_project
-cp test-profiles.yml profiles.yml
-# Edit profiles.yml - replace placeholders with your Snowflake credentials
+export DBT_PROFILES_DIR=..
 dbt run
 ```
 
