@@ -8,13 +8,21 @@ x-airflow-common:
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+    # Dedicated Airflow metadata DB. POSTGRES_* fallback keeps existing .env files working.
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:-${POSTGRES_USER:-airflow}}:${AIRFLOW_DB_PASSWORD:-${POSTGRES_PASSWORD:-airflow}}@postgres/${AIRFLOW_DB_NAME:-${POSTGRES_DB:-airflow}}
     AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     AIRFLOW_CONN_MY_SNOWFLAKE_CONN: snowflake://${DBT_USER}:${DBT_PASSWORD}@/${DBT_DATABASE}/${DBT_SCHEMA}?warehouse=${DBT_WAREHOUSE}&role=${DBT_ROLE}&account=${DBT_ACCOUNT}&database=${DBT_DATABASE}
+    DBT_ACCOUNT: ${DBT_ACCOUNT}
+    DBT_DATABASE: ${DBT_DATABASE}
+    DBT_PASSWORD: ${DBT_PASSWORD}
+    DBT_ROLE: ${DBT_ROLE}
+    DBT_SCHEMA: ${DBT_SCHEMA}
+    DBT_USER: ${DBT_USER}
+    DBT_WAREHOUSE: ${DBT_WAREHOUSE}
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     AIRFLOW_VAR_TOM_TOM_API_KEYS: ${TOMTOM_API_KEY}
     AIRFLOW__WEBSERVER__WORKERS: '2'
@@ -25,7 +33,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/dbt:/opt/airflow/dbt
-    - ${AIRFLOW_PROJ_DIR:-.}/dbt/profiles.yml:/opt/dbt/config/profiles.yml
+    - ${AIRFLOW_PROJ_DIR:-.}/dbt/test-profiles.yml:/opt/dbt/config/profiles.yml:ro
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
@@ -37,15 +45,15 @@ services:
     container_name: airflow_postgres
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${AIRFLOW_DB_USER:-${POSTGRES_USER:-airflow}}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:-${POSTGRES_PASSWORD:-airflow}}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME:-${POSTGRES_DB:-airflow}}
     deploy:
       resources:
         limits:
           memory: 512M
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       retries: 5
       start_period: 5s
